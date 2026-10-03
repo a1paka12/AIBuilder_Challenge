@@ -60,8 +60,8 @@ const PROMISES: TrustPromise[] = [
     ),
   },
   {
-    title: '사진은 내 기기에',
-    desc: '방 사진은 서버로 보내지 않고, 파일 지문만 기록해요.',
+    title: '원본 사진은 보내지 않아요',
+    desc: '가린 처리본만 — 로그인해서 저장할 때만 내 계정에 보관하고, 아니면 지문만 기록해요.',
     icon: (
       <Icon>
         <rect x="6.5" y="2.5" width="11" height="19" rx="2" />

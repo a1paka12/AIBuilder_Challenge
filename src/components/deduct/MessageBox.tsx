@@ -52,6 +52,14 @@ export default function MessageBox() {
   const [includeRest, setIncludeRest] = useState(false)
   const [refIds, setRefIds] = useState<string[]>([])
   const [canShare] = useState(() => typeof navigator !== 'undefined' && typeof navigator.share === 'function')
+  // 문자 앱 열기는 휴대폰에서만 — 터치 기기이면서 모바일 브라우저일 때
+  const [isMobile] = useState(
+    () =>
+      typeof navigator !== 'undefined' &&
+      /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) &&
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(pointer: coarse)').matches === true,
+  )
   const [toast, setToast] = useState(false)
   const [copyFail, setCopyFail] = useState(false)
   const [emptyHint, setEmptyHint] = useState(false)
@@ -204,9 +212,11 @@ export default function MessageBox() {
                 공유하기
               </button>
             )}
-            <a className="btn dd-send" href={'sms:?&body=' + encodeURIComponent(message)}>
-              문자 앱 열기
-            </a>
+            {isMobile && (
+              <a className="btn dd-send" href={'sms:?&body=' + encodeURIComponent(message)}>
+                문자 앱 열기
+              </a>
+            )}
           </div>
           <p className="small muted">보내기는 직접 해요. 보증금 지킴이는 대신 보내지 않아요.</p>
           {copyFail && (

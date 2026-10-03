@@ -1,5 +1,6 @@
 /*
- * 첫 화면 (#/) — 메인 비주얼 → 업무 바로가기 → 진행 4단계 → 업무별 안내 → 이용 안내 → 이벤트 띠 → 약속 → 설문
+ * 첫 화면 (#/) — 메인 비주얼(무료/유료 한 줄 포함) → 서비스 원칙 마크 → 진행 4단계 → 고객센터 한 줄 → 약속 → 이벤트 띠
+ * (.hg-* 업무별 안내는 고객센터 화면이 ServiceGuide 로 쓴다)
  * 공통 토큰·클래스(index.css)만 쓰고 index.css 는 손대지 않는다(필요한 덮어쓰기는 여기서).
  * 정부 상징·기관 로고·인증 도장(둥근 배지) 모양은 쓰지 않는다. 모바일 390px 우선 · 좌우 16px 은 .main 이 준다 · 가로 스크롤 없음
  * 터치 44px · 포커스 표시는 전역 :focus-visible · 움직임 줄이기에서는 전환을 끈다.
@@ -59,6 +60,23 @@
   border: 1px solid #c9d8ee;
   color: var(--primary);
 }
+
+/* 무료/유료 한 줄 (PRD 7절 — 무료 기능과 기록북 상품) */
+.home-plan { margin: 10px 0 0; font-size: 14px; line-height: 1.7; color: #3b424c; }
+.home-plan-tag {
+  display: inline-block;
+  margin-right: 4px;
+  padding: 0 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid #b7e0cb;
+  background: var(--success-bg);
+  color: var(--success);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.6;
+}
+.home-plan-tag.is-paid { border-color: #c9d8ee; background: var(--chip); color: var(--primary); }
+.home-plan-sep { margin: 0 6px; color: var(--muted); }
 
 /* 그림(.hero-preview 는 index.css) — 800px 이하에서 숨기는 전역 규칙을 덮어 아래에 그대로 보여 준다 */
 .home-hero-visual { position: relative; z-index: 1; min-width: 0; }
@@ -212,9 +230,6 @@
 .hg-dd { margin: 0; min-width: 0; color: var(--text); overflow-wrap: anywhere; }
 .hg-actions { grid-area: actions; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; padding-top: 12px; border-top: 1px dashed var(--line); }
 
-/* ── 이용 안내 (.notice-list 는 index.css) ───────────────────────── */
-.home-notes .notice-list .notice { height: 100%; }
-
 /* ── 4) 이벤트 띠 ───────────────────────── */
 .home-band {
   display: grid;
@@ -239,9 +254,6 @@
 .home-band .btn.home-band-ghost:hover { background: rgba(255, 255, 255, 0.12); border-color: #fff; color: #fff; }
 .home-band :focus-visible { outline-color: #fff; }
 
-/* ── 설문 이동 목표 (포커스를 받되 테두리는 그리지 않는다 — 카드 자체가 보인다) ── */
-.home-survey:focus, .home-survey:focus-visible { outline: none; }
-
 /* ── 반응형 ───────────────────────── */
 @media (max-width: 900px) {
   .qm-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -264,6 +276,7 @@
   .home-cta .btn { flex: 1 1 calc(50% - 4px); min-width: 0; padding-left: 10px; padding-right: 10px; }
   .home-cta .home-cta-main { flex: 1 1 100%; }
   .home-facts { gap: 4px 12px; font-size: 13px; }
+  .home-plan { font-size: 13px; }
 
   .qm-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .qm-grid li.is-featured { grid-column: 1 / -1; }

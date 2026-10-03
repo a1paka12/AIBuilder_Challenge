@@ -71,22 +71,22 @@ export interface ReceiptResponse {
 /** 방 상태 기록 */
 export type Zone = '벽' | '바닥' | '욕실' | '주방' | '창문/문' | '옵션 가전' | '기타'
 export type Phase = '입주' | '퇴실'
-export type DateSource = 'exif' | 'manual' | 'none'
 
 export interface RoomPhoto {
   id: string
   zone: Zone
   phase: Phase
-  /** 브라우저 안에서만 쓰는 object URL (서버로 보내지 않음) */
+  /** 로그아웃 상태: 브라우저 안에서만 쓰는 object URL · 서버 보관(serverId 있음): /api/photos/<id>/file */
   url: string
   fileName: string
   sha256: string
   memo: string
-  date: string | null
-  dateSource: DateSource
+  /** 서버 기록(지문 수신). 기록 날짜는 receipt.receivedAt 하나뿐 — 사진 메타데이터의 날짜는 읽지 않는다. 실패·미기록이면 null */
   receipt: ReceiptResponse | null
   /** 개인정보 가림 처리본인지 — 브라우저 canvas 재인코딩으로 메타데이터(EXIF·GPS)가 제거된 새 파일 (PRD FR-01). url·sha256 은 처리본 기준 */
   masked?: boolean
   /** 가림 상자 수 */
   maskCount?: number
+  /** 로그인 사용자의 서버 보관 사진 id (있으면 url 은 /api/photos/<id>/file, object URL 아님) */
+  serverId?: number
 }

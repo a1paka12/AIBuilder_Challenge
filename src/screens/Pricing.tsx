@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { go } from '../router'
-import { getStats, postIntent, SURVEY_REASON_LABEL, type Stats, type SurveyReason } from '../api'
+import { getStats, postIntent, type Stats } from '../api'
 import '../styles/pages.css'
 
 type Product = 'book' | 'cert'
@@ -44,7 +44,6 @@ const PAID: Row[] = [
 
 const DONE_MSG = '의향을 기록했어요(결제 아님)'
 const RETRY_MSG = '지금은 기록하지 못했어요. 잠시 후 다시 눌러 주세요.'
-const REASON_KEYS = Object.keys(SURVEY_REASON_LABEL) as SurveyReason[]
 
 /* 이미 의향을 남긴 브라우저는 새로고침해도 같은 표시 (서버도 clientId로 중복을 세지 않는다) */
 const intentKey = (p: Product) => `bj_intent_${p}`
@@ -64,7 +63,6 @@ function saveIntent(p: Product): void {
 }
 
 const num = (n: number) => n.toLocaleString('ko-KR')
-const pct = (n: number, d: number): string => (d > 0 ? `${Math.round((n / d) * 100)}%` : '—')
 
 function CheckIcon() {
   return (
@@ -121,15 +119,6 @@ export default function Pricing() {
         stats.intents.cert > 0 ? `내용증명 의향 ${num(stats.intents.cert)}건` : null,
       ].filter((x): x is string => x !== null)
     : []
-  const survey = stats?.survey ?? null
-  const askedAnswered = survey ? survey.asked.yes + survey.asked.no : 0
-  const reasons = survey
-    ? REASON_KEYS.map((k) => ({ key: k, label: SURVEY_REASON_LABEL[k], n: survey.reasons[k] ?? 0 })).sort((a, b) => b.n - a.n)
-    : []
-  const reasonMax = Math.max(1, ...reasons.map((r) => r.n))
-  const reasonTotal = reasons.reduce((s, r) => s + r.n, 0)
-  const today: Partial<Record<string, number>> = stats?.metrics.today ?? {}
-  const total: Partial<Record<string, number>> = stats?.metrics.total ?? {}
 
   return (
     <section className="page pricing">
@@ -208,84 +197,7 @@ export default function Pricing() {
         보증금 지킴이는 공개 자료를 찾아 보여 주는 정보 제공 도구이며, 법률 판단이나 대리를 하지 않습니다. 공제 정리 결과나 판단을 따로 판매하지 않아요.
       </p>
 
-      {/* ── 현장 반응(익명 집계) — 집계를 못 불러오면 패널 전체를 숨긴다 ── */}
-      {stats && survey && (
-        <section className="field-panel card" aria-labelledby="field-title">
-          <div className="field-head">
-            <h2 id="field-title">현장 반응</h2>
-            <p className="muted small">설문·의향·사용 횟수의 익명 집계예요. 이름·연락처는 받지 않아요.</p>
-          </div>
 
-          {survey.total > 0 ? (
-            <>
-              <dl className="stat-grid">
-                <div className="stat">
-                  <dt>설문 응답</dt>
-                  <dd>
-                    <b>{num(survey.total)}</b>
-                    <span>건</span>
-                  </dd>
-                </div>
-                <div className="stat">
-                  <dt>떼인 적 있음</dt>
-                  <dd>
-                    <b>{pct(survey.deducted.yes, survey.total)}</b>
-                    <span>
-                      {num(survey.deducted.yes)}/{num(survey.total)}명
-                    </span>
-                  </dd>
-                </div>
-                <div className="stat">
-                  <dt>그중 안 물어봄</dt>
-                  <dd>
-                    <b>{pct(survey.asked.no, askedAnswered)}</b>
-                    <span>
-                      {num(survey.asked.no)}/{num(askedAnswered)}명
-                    </span>
-                  </dd>
-                </div>
-              </dl>
-
-              <h3 className="field-sub">안 물어본 이유</h3>
-              {reasonTotal > 0 ? (
-                <ul className="bars" aria-label="안 물어본 이유별 응답 수">
-                  {reasons.map((r) => (
-                    <li className="bar-row" key={r.key}>
-                      <span className="bar-label">{r.label}</span>
-                      <span className="bar-track" aria-hidden="true">
-                        <span className="bar-fill" style={{ width: `${(r.n / reasonMax) * 100}%` }} />
-                      </span>
-                      <span className="bar-value">{num(r.n)}명</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="field-empty">아직 응답이 없어요</p>
-              )}
-            </>
-          ) : (
-            <p className="field-empty">아직 응답이 없어요</p>
-          )}
-
-          <h3 className="field-sub">오늘 사용</h3>
-          <dl className="stat-grid">
-            <div className="stat">
-              <dt>오늘 정리 횟수</dt>
-              <dd>
-                <b>{num(today.extract_ok ?? 0)}</b>
-                <span>회 · 누적 {num(total.extract_ok ?? 0)}회</span>
-              </dd>
-            </div>
-            <div className="stat">
-              <dt>오늘 문자 복사 횟수</dt>
-              <dd>
-                <b>{num(today.copy_message ?? 0)}</b>
-                <span>회 · 누적 {num(total.copy_message ?? 0)}회</span>
-              </dd>
-            </div>
-          </dl>
-        </section>
-      )}
 
       <div className="page-actions">
         <button type="button" className="btn primary" onClick={() => go('deduct')}>

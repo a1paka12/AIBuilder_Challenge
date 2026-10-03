@@ -10,7 +10,7 @@
 
 | 원칙 | 구현 |
 |---|---|
-| 원문은 기기에 | 공제 문자 원문·사진 원본은 브라우저 밖으로 나가지 않는다. 서버에는 가린 처리본(텍스트)과 사진 처리본의 지문(SHA-256)만 간다 |
+| 원문은 기기에 | 공제 문자 원문·사진 원본은 브라우저 밖으로 나가지 않는다. 서버에는 가린 처리본(텍스트)과 사진 처리본의 지문(SHA-256)만 간다. 로그인 회원이 동의하고 저장하면 **가린 사진 처리본**만 그 회원 계정에 보관한다(원본은 받지 않음) |
 | AI는 정리만 | AI는 항목명·청구액·원문 인용·확인 필요 여부만 옮겨 적는다. 공제가 맞는지, 특약이 유효한지, 얼마를 돌려받을지는 판단하지 않는다 |
 | 계산은 결정적으로 | 합계, 참고 자료 매칭, 문의 문자, 내용증명 서식, 변호사 조건 일치 점수는 모두 브라우저의 정해진 코드로 계산한다. 같은 입력이면 같은 결과가 나온다 |
 
@@ -36,10 +36,12 @@ flowchart LR
         CADDY["Caddy 2.11<br/>HTTPS 자동 인증서"]
         EXP["Express 4 · Node 22<br/>127.0.0.1:8420<br/>systemd bojeung.service"]
         DIST["dist/<br/>빌드된 화면 + /slides/"]
-        DB[("SQLite server/data/bojeung.db<br/>receipts · intents · survey · metrics<br/>users (FR-10, 선택)")]
+        DB[("SQLite server/data/bojeung.db<br/>receipts · intents · survey · metrics<br/>users · photos (FR-10, 선택)")]
+        PH[("server/data/photos/회원번호/<br/>가린 사진 처리본 (로그인·동의 시)")]
         CADDY <-->|"리버스 프록시"| EXP
         EXP -->|"정적 파일"| DIST
         EXP <-->|"node:sqlite"| DB
+        EXP <-->|"파일 쓰기·읽기 (본인만)"| PH
     end
 
     OAI["OpenAI API (미국)<br/>gpt-5.4-mini<br/>구조화 출력 JSON Schema strict"]
@@ -53,7 +55,7 @@ flowchart LR
 
 - Express는 `127.0.0.1`에만 열려 있다. 외부 요청은 모두 Caddy(HTTPS)를 거친다.
 - Express 프로세스 하나가 API(`/api/*`)와 빌드된 화면(`dist/`)을 함께 제공한다. `/api/`가 아닌 주소는 `index.html`을 돌려준다.
-- 서버 DB는 SQLite 파일 하나다(Node 내장 `node:sqlite`). 공제 문자 본문·사진·이름은 저장하지 않는다. 표 구조는 [ERD](ERD.md), 요청·응답은 [API](API.md)에 있다.
+- 서버 DB는 SQLite 파일 하나다(Node 내장 `node:sqlite`). 공제 문자 본문·원본 사진·이름은 저장하지 않는다. 로그인 회원이 저장한 가린 사진 처리본만 `DATA_DIR/photos/<user_id>/<id>.jpg|png` 파일로 두고 목록은 `photos` 표에 둔다. 표 구조는 [ERD](ERD.md), 요청·응답은 [API](API.md)에 있다.
 
 | 서버 표 | 들어가는 값 | 들어가지 않는 값 |
 |---|---|---|
@@ -61,7 +63,8 @@ flowchart LR
 | `intents` | 무작위 기기 ID, 상품(book·cert), 가격 가설, 시각 | 결제 정보(결제 기능 없음) |
 | `survey` | 무작위 기기 ID, 보기 선택값, 시각 | 이름·연락처·자유 입력 |
 | `metrics` | 날짜, 이벤트 이름, 횟수 | 누가 했는지 |
-| `users` (FR-10, 선택) | 가입 방법, 이메일(소문자), 비밀번호 scrypt 해시 또는 구글 `sub`, 동의 판, 가입·마지막 로그인 시각 | 이름·사진·전화번호, 비밀번호 원문, 구글 ID 토큰. 설문·의향과 연결하지 않음 |
+| `users` (FR-10, 선택) | 가입 방법, 이메일(소문자), 비밀번호 scrypt 해시 또는 구글 `sub`, 동의 판, 가입·마지막 로그인 시각, 사진 저장 동의 시각 | 이름·프로필 사진·전화번호, 비밀번호 원문, 구글 ID 토큰. 설문·의향과 연결하지 않음 |
+| `photos` (FR-10, 로그인·동의 시) | 회원 번호, 처리본 SHA-256·형식(JPEG/PNG)·크기, 구역, 입주/퇴실, 메모, 수신 시각, HMAC 서명 (파일 자체는 디스크) | 원본 사진, 원본 파일명, EXIF·GPS 등 메타데이터(남아 있으면 거절) |
 
 ---
 
@@ -130,9 +133,39 @@ sequenceDiagram
     end
 ```
 
-- 사진 업로드 API는 없다. 서버가 받는 값은 지문 문자열 하나다. 원본 파일명도 보내지 않는다.
+- 로그인하지 않으면 서버가 받는 값은 지문 문자열 하나다. 원본 파일명도 보내지 않는다. 로그인 회원의 저장 경로는 2-2-1에 있다.
 - 서버 기록은 "이 시각에 이 지문을 가진 파일이 있었다"만 보여 준다. 촬영 시점이나 사진 내용을 증명하지 않는다.
-- 사진 날짜는 EXIF에서 읽거나 사용자가 직접 입력하고, 어느 쪽인지 표시한다. 메타데이터는 처리본에서 지워진다.
+- 기록 날짜는 서버가 받은 시각 하나뿐이다. 사진 메타데이터의 촬영 날짜는 읽지 않고, 메타데이터는 처리본에서 지워진다.
+
+### 2-2-1. 사진: 로그인 회원의 처리본 보관 (`POST /api/photos`)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as 사용자(로그인)
+    participant B as 브라우저
+    participant S as Express (Caddy 경유)
+    participant D as SQLite photos·receipts
+    participant F as 디스크 photos/회원번호/
+
+    U->>B: 사진 가림 → 처리본(메타데이터 제거) 미리보기
+    U->>B: (처음이면) [필수] 서버 보관 동의 체크 → [확인하고 저장하기]
+    opt 처음 저장
+        B->>S: POST /api/photos/consent
+        S->>D: users.photo_consent_at = now
+    end
+    B->>S: POST /api/photos?zone&phase&memo<br/>본문 = 처리본 바이트 (JPEG·PNG, 6MB 이하)
+    S->>S: IP당 분당 20회 → 로그인(401) → 동의(403)<br/>매직 바이트(415) → 메타데이터 검사(422)<br/>SHA-256, 같은 지문이면 기존 것 200 → 30장(409)
+    S->>D: photos 행 + receipts (sha256, received_at, HMAC sig)
+    S->>F: id.jpg 또는 id.png 저장 (임시 파일 → 이름 바꾸기, 0600)
+    S-->>B: 201 photo (url = /api/photos/:id/file)
+    B->>S: GET /api/photos/:id/file (쿠키, 본인만)
+    S-->>B: 파일 (Cache-Control: private, no-store · nosniff)
+```
+
+- 원본(가리기 전 사진)은 어느 경로로도 받지 않는다. 서버는 메타데이터가 남은 파일을 거절해 "가린 처리본만" 원칙을 한 번 더 지킨다.
+- 공개 링크는 없다. 파일 주소는 로그인한 본인 쿠키로만 열리고, 남의 사진은 404다.
+- 보유: 한 장 삭제(`DELETE /api/photos/:id`)·탈퇴(`DELETE /api/me`) 시 파일·행 즉시 삭제, 서버가 1시간마다 확인해 `PHOTO_PURGE_AT`(기본 2026-12-31 24:00 KST)이 지나면 전부 삭제.
 
 ### 2-3. 데이터 경계 요약
 
@@ -140,7 +173,7 @@ sequenceDiagram
 flowchart TB
     subgraph KEEP["브라우저 밖으로 나가지 않음"]
         K1["공제 문자 원문 · 치환 대응표"]
-        K2["사진 원본 · 가린 처리본 · 파일명"]
+        K2["사진 원본 · 파일명<br/>(로그아웃 상태의 가린 처리본)"]
         K3["특약 문구 · 계약자 선택"]
         K4["문의 문자 · 내용증명 입력값"]
         K5["변호사 찾아보기 조건"]
@@ -155,9 +188,13 @@ flowchart TB
         S1["사진 처리본 지문 + 수신 시각 + 서명"]
         S2["설문 선택값 · 구매 의향 · 익명 횟수"]
     end
+    subgraph ACC["로그인 회원 계정에 보관 (삭제·탈퇴 즉시, 늦어도 2026-12-31)"]
+        A1["가린 사진 처리본 + 구역·입주/퇴실·메모"]
+    end
     K1 -->|"치환 + 사용자 확인"| P1
     P1 --> E1
-    K2 -->|"지문만 계산"| S1
+    K2 -->|"가림 + 메타데이터 제거 → 지문만"| S1
+    K2 -->|"로그인·동의 시 가린 처리본만"| A1
 ```
 
 보유 기간·국외 이전·권리 행사는 [PRIVACY_LEGAL.md](PRIVACY_LEGAL.md)와 화면 `#/privacy`에 있다.
@@ -261,7 +298,7 @@ flowchart LR
 | 프로세스 관리 | systemd `bojeung.service` (재시작·부팅 시 자동 실행) |
 | HTTPS | Caddy 2.11 리버스 프록시, 인증서 자동 발급·갱신, `sslip.io` 도메인 |
 | 배포 스크립트 | `deploy.sh`: 빌드 → rsync → 의존성 설치 → 서비스 재시작 → 헬스 체크 |
-| 서버 데이터 보존 | rsync에서 `server/data`를 빼서 배포해도 DB가 지워지지 않는다 |
+| 서버 데이터 보존 | rsync에서 `server/data`를 빼서 배포해도 DB와 저장한 사진(`server/data/photos/`)이 지워지지 않는다. 사진 폴더는 `.gitignore`로 저장소에도 올리지 않는다 |
 
 ---
 
@@ -271,7 +308,7 @@ flowchart LR
 |---|---|
 | API 키 노출 | `OPENAI_API_KEY`·`RECEIPT_SECRET`·`SESSION_SECRET`은 서버 `.env`(환경 변수)에만 둔다. 저장소에는 `.env.example`만 있다. 브라우저는 OpenAI를 직접 부르지 않는다 |
 | 전송 구간 | Caddy HTTPS. Express는 `127.0.0.1`에만 열림 |
-| 남용·비용 | POST API에 IP당 분당 30회 제한. IP는 이 제한을 위해 메모리에만 두고 저장하지 않는다. 본문 3,000자·요청 32KB 제한 |
+| 남용·비용 | POST API에 IP당 분당 30회 제한(사진 업로드는 분당 20회). IP는 이 제한을 위해 메모리에만 두고 저장하지 않는다. 본문 3,000자·요청 32KB 제한(사진 업로드 경로만 6MB) |
 | AI 지연 | 45초 후 중단, 화면은 입력을 유지하고 [다시 시도]·[직접 입력] 제공 |
 | 프롬프트 인젝션 | 처리본을 구분자로 감싸 "자료로만 다뤄라" 지시, 출력은 스키마로 고정 |
 | AI가 없는 인용을 지어냄 | 서버가 원문과 대조해 없으면 "원문 확인 필요" |
@@ -281,6 +318,7 @@ flowchart LR
 | (FR-10) 비밀번호 유출 | `crypto.scrypt` + 무작위 salt 해시만 저장, 비교는 `timingSafeEqual`, 원문은 로그에도 남기지 않음. 로그인 실패는 "계정 없음"과 "비밀번호 틀림"을 구분하지 않음 |
 | (FR-10) 무차별 대입 | `/api/auth/*`는 IP당 분당 10회 |
 | (FR-10) 세션 탈취·위조 | `HttpOnly`(스크립트가 못 읽음)·`SameSite=Lax`·HTTPS면 `Secure`, HMAC 서명 검증, 30일 만료 |
+| (FR-10) 사진 보관 | 로그인·동의 필수, 본인 것만(`id AND user_id`로 조회, 남의 것 404), 공개 링크 없음, 매직 바이트로 JPEG·PNG만, 메타데이터(EXIF·XMP·IPTC·PNG 텍스트·시각 청크) 남은 파일 거절, 회원당 30장, 파일 응답 `Cache-Control: private, no-store`·`X-Content-Type-Options: nosniff`, 파일 권한 0600, 삭제·탈퇴 즉시·기한 자동 삭제 |
 | (FR-10) 가짜 구글 토큰 | 서버가 tokeninfo로 aud·iss·exp·email_verified를 확인한 뒤에만 가입·로그인. `GOOGLE_CLIENT_ID`(공개값)가 없으면 503 |
 
 정보보호 인증은 받지 않았다. 위 표는 팀이 직접 적용하고 점검한 내용이다.
@@ -303,13 +341,13 @@ AIBuilder_Challenge/
 │   ├── types.ts            공통 타입
 │   ├── screens/            화면 하나당 파일 하나 (Home, Deduct, Record, Lawyers, Help, Cert, Pricing, Event, Privacy)
 │   ├── components/         화면 부품 (deduct/, home/, record/, 팝업·설문·바닥글 준수 표시·서비스 원칙 마크 등)
-│   ├── lib/                순수 로직: mask.ts(텍스트 가림), imageMask.ts(사진 가림·재인코딩), exif.ts(날짜 읽기),
+│   ├── lib/                순수 로직: mask.ts(텍스트 가림), imageMask.ts(사진 가림·재인코딩), photos.ts(사진 보관 API 호출), auth.ts(로그인),
 │   │                       lawyerMatch.ts(조건 일치 계산), promo.ts(팝업·혜택 표시)
 │   ├── data/               고정 데이터: references.ts(참고 자료 5종), lawyers.ts(가상 프로필), agencies.ts(무료 상담 기관), company.ts(운영 정보)
 │   └── styles/             화면별 CSS (외부 UI 라이브러리 없음)
 ├── server/
 │   ├── server.mjs          Express API + 정적 파일 제공
-│   └── data/               SQLite DB (저장소에 올리지 않음)
+│   └── data/               SQLite DB + photos/<user_id>/ 저장 사진 (저장소에 올리지 않음, DATA_DIR로 위치 변경 가능)
 ├── docs/                   PRD와 설계 문서
 ├── deploy.sh               배포 스크립트
 └── .env.example            환경 변수 이름 (실제 값은 .env, 저장소에 없음)

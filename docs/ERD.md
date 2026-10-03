@@ -16,16 +16,18 @@
 | 30초 현장 설문 `survey` | 서버 SQLite | 2026-12-31 일괄 삭제 | `POST /api/survey` |
 | 익명 사용 횟수 `metrics` | 서버 SQLite | 2026-12-31 일괄 삭제 | `POST /api/metric` + 서버 내부 집계 |
 | 회원 계정 `users` (FR-10, 선택) | 서버 SQLite | 탈퇴 즉시 삭제, 늦어도 2026-12-31 일괄 삭제 | `POST /api/auth/*`, `DELETE /api/me` |
+| 저장한 방 사진 `photos` + 사진 파일 (FR-10, 로그인·동의 시) | 서버 SQLite + 서버 디스크 `<DATA_DIR>/photos/<user_id>/<id>.jpg\|png` | 삭제·탈퇴 즉시 삭제, 늦어도 2026-12-31 24:00 KST 서버가 자동 일괄 삭제 | `POST`·`GET /api/photos`, `GET /api/photos/:id/file`, `PATCH`·`DELETE /api/photos/:id`, `POST /api/photos/consent` |
 | 로그인 세션 쿠키 `bj_session` (FR-10) | 브라우저 쿠키(HttpOnly) | 30일 또는 로그아웃·탈퇴 시 삭제 | `server/server.mjs` |
 | 무작위 기기 ID·팝업·혜택 표시 | 브라우저 저장소(localStorage·sessionStorage) | 사용자가 지울 때까지 / 탭 닫을 때까지 | `src/api.ts`, `src/lib/promo.ts`, `src/screens/Pricing.tsx` |
 | 공제 정리 상태(원문·처리본·항목) | 브라우저 메모리(React 상태) | 새로고침·탭 닫기 시 사라짐 | `src/state.tsx`, `src/types.ts` |
-| 방 사진(가림 처리본) | 브라우저 메모리(object URL) | 새로고침·탭 닫기 시 사라짐 | `src/types.ts` `RoomPhoto` |
+| 방 사진 원본 · (로그인하지 않은 경우) 가림 처리본 | 브라우저 메모리(object URL) | 새로고침·탭 닫기 시 사라짐 | `src/types.ts` `RoomPhoto` |
 | 가상 프로필(변호사 데모 데이터) | 프론트엔드 정적 데이터 | 배포본과 함께 | `src/data/lawyers.ts` |
 | 참고 자료 5종 | 프론트엔드 정적 데이터 | 배포본과 함께 | `src/data/references.ts` |
 | 무료 상담 기관 5곳 | 프론트엔드 정적 데이터 | 배포본과 함께 | `src/data/agencies.ts` |
 
-- 회원가입은 선택 기능(FR-10)이다. 가입하지 않아도 모든 기능을 쓸 수 있다. 서버 DB에는 5개 테이블이 있고, **이름·전화번호·공제 문자 본문·사진은 어느 테이블에도 없다.** `users`에는 로그인에 필요한 이메일과 비밀번호 해시(또는 구글 계정 식별값)만 있다.
-- `users`는 다른 테이블과 연결하지 않는다. 설문·구매 의향은 지금처럼 익명 기기 ID(`client_id`) 기준이며, 가입 중 설문에 응답해도 계정 번호는 함께 저장되지 않는다.
+- 회원가입은 선택 기능(FR-10)이다. 가입하지 않아도 모든 기능을 쓸 수 있다. 서버 DB에는 6개 테이블이 있고, **이름·전화번호·공제 문자 본문·원본 사진은 어느 테이블에도 없다.** `users`에는 로그인에 필요한 이메일과 비밀번호 해시(또는 구글 계정 식별값), 사진 저장 동의 시각만 있다.
+- 사진은 로그인 회원이 동의하고 [확인하고 저장하기]를 누른 **가린 처리본만** 서버 디스크에 두고, 그 목록·구역·메모는 `photos`에 둔다. 원본은 받지 않고, 메타데이터(EXIF·XMP 등)가 남은 파일은 서버가 거절한다.
+- `users`는 `photos` 외에는 다른 테이블과 연결하지 않는다. 설문·구매 의향은 지금처럼 익명 기기 ID(`client_id`) 기준이며, 가입 중 설문에 응답해도 계정 번호는 함께 저장되지 않는다.
 - 서버 DB는 Node 내장 `node:sqlite`(`DatabaseSync`)를 쓰고 WAL 모드로 연다.
 
 ---
@@ -73,6 +75,26 @@ CREATE TABLE IF NOT EXISTS users (
   created_at      TEXT NOT NULL,
   last_login_at   TEXT NOT NULL
 );
+-- 사진: 기기에서 가리기·메타데이터 제거를 마친 처리본만 받는다. 파일은 DATA_DIR/photos/<user_id>/<id>.jpg|png
+CREATE TABLE IF NOT EXISTS photos (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id     INTEGER NOT NULL,
+  sha256      TEXT NOT NULL,
+  mime        TEXT NOT NULL CHECK (mime IN ('image/jpeg', 'image/png')),
+  bytes       INTEGER NOT NULL,
+  zone        TEXT NOT NULL,
+  phase       TEXT NOT NULL,
+  memo        TEXT NOT NULL DEFAULT '',
+  received_at TEXT NOT NULL,
+  sig         TEXT NOT NULL,
+  UNIQUE (user_id, sha256)
+);
+```
+
+`users`에 `photo_consent_at` 칸이 없으면 시작할 때 덧붙인다(이미 있는 DB도 그대로 씀).
+
+```sql
+ALTER TABLE users ADD COLUMN photo_consent_at TEXT NULL;  -- 사진 저장 동의 시각, 동의 전 NULL
 ```
 
 ### 2-1. 서버 DB 다이어그램
@@ -116,10 +138,24 @@ erDiagram
         TEXT consent_version "2026-10-03"
         TEXT created_at "ISO 8601 UTC"
         TEXT last_login_at "ISO 8601 UTC"
+        TEXT photo_consent_at "사진 저장 동의 시각 | NULL"
+    }
+    USERS ||--o{ PHOTOS : "user_id (회원당 최대 30장)"
+    PHOTOS {
+        INTEGER id PK "자동 증가 - 파일 이름 id.jpg|png"
+        INTEGER user_id "users.id (탈퇴 시 행·폴더 삭제)"
+        TEXT sha256 "서버가 계산한 처리본 SHA-256 - (user_id, sha256) UNIQUE"
+        TEXT mime "image/jpeg | image/png"
+        INTEGER bytes "파일 크기 (최대 6MB)"
+        TEXT zone "구역 (40자 이내)"
+        TEXT phase "입주 | 퇴실"
+        TEXT memo "선택, 300자 이내"
+        TEXT received_at "서버 수신 시각 ISO 8601 UTC"
+        TEXT sig "HMAC-SHA256(sha256|received_at)"
     }
 ```
 
-`receipts`·`metrics`는 다른 테이블과 연결되지 않는다(기기 ID도 받지 않는다). `users`도 어느 테이블과도 연결되지 않는다(설문·의향에 계정 번호를 넣지 않는다).
+`receipts`·`metrics`는 다른 테이블과 연결되지 않는다(기기 ID도 받지 않는다). `users`는 `photos`(`user_id`)와만 연결되고, 설문·의향·지문 기록에는 계정 번호를 넣지 않는다. 사진을 저장할 때 서버가 같은 `(sha256, received_at, sig)`를 `receipts`에도 한 줄 넣지만 `receipts`에는 계정 번호가 없다(외래 키 없음).
 
 ### 2-2. 컬럼 설명
 
@@ -186,7 +222,28 @@ erDiagram
 
 - 이메일 인증 메일은 보내지 않는다(대회 범위). 그래서 이메일 가입 계정의 이메일이 본인 것인지는 확인하지 않는다. 구글 가입은 구글이 확인한 이메일(`email_verified`)만 받는다.
 - 같은 이메일로 이메일 가입이 이미 있으면 구글 간편 가입은 막는다(`409 email_exists_password`). 계정 합치기는 하지 않는다.
-- 탈퇴(`DELETE /api/me`)하면 그 행을 바로 지운다. 백업·보관 사본을 따로 두지 않는다.
+- `photo_consent_at`: 처음 사진을 저장하기 전에 받는 사진 저장 동의 시각(`POST /api/photos/consent`). NULL이면 `POST /api/photos`가 `403 photo_consent_required`로 거절한다.
+- 탈퇴(`DELETE /api/me`)하면 그 행과 그 회원의 `photos` 행·사진 폴더를 바로 지운다. 백업·보관 사본을 따로 두지 않는다.
+
+**`photos` — 로그인 회원이 저장한 가린 사진 처리본 (FR-10)**
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| `id` | INTEGER PK | 자동 증가. 파일 이름이 된다: `<DATA_DIR>/photos/<user_id>/<id>.jpg` 또는 `.png` |
+| `user_id` | INTEGER | 저장한 회원(`users.id`). 조회·수정·삭제는 항상 `id AND user_id`로 찾아 남의 사진은 404 |
+| `sha256` | TEXT | 서버가 받은 바이트로 직접 계산한 SHA-256(소문자 16진수 64자). 같은 회원이 같은 파일을 다시 올리면 새로 만들지 않고 기존 행을 돌려준다(`UNIQUE(user_id, sha256)`) |
+| `mime` | TEXT | `image/jpeg` · `image/png`. Content-Type이 아니라 **매직 바이트**로 판별한 값 |
+| `bytes` | INTEGER | 파일 크기. 요청 본문은 6MB까지 |
+| `zone` | TEXT | 구역(벽·바닥·욕실 등). 앞뒤 공백 제거, 1~40자 |
+| `phase` | TEXT | `입주` · `퇴실` |
+| `memo` | TEXT | 선택 메모, 300자 이내. 기본 빈 문자열 |
+| `received_at` | TEXT | 서버 수신 시각(ISO 8601, UTC). 기록 날짜는 이 값 하나뿐이다(사진 메타데이터 날짜는 읽지 않음) |
+| `sig` | TEXT | `HMAC-SHA256(RECEIPT_SECRET, "<sha256>|<received_at>")` 16진수 — `receipts`와 같은 서명 방식 |
+
+- 받는 파일: 매직 바이트가 JPEG·PNG가 아니면 `415`. JPEG에 APP1(EXIF/XMP)·APP13(IPTC) 세그먼트나 EOI 뒤 꼬리 데이터, PNG에 `tEXt`·`iTXt`·`zTXt`·`eXIf`·`tIME` 청크나 IEND 뒤 데이터가 있으면 `422 metadata_present`로 거절한다. 원본(가리기 전 사진)은 받지 않는다.
+- 회원당 30장(`409 limit_reached`). 파일은 임시 파일로 쓴 뒤 이름을 바꿔 저장하고 권한은 `0600`. 파일 쓰기에 실패하면 행도 지운다.
+- 삭제(`DELETE /api/photos/:id`)는 파일과 행을 함께 지운다. 탈퇴는 회원 폴더 전체와 행을 지운다.
+- 보유 기한: 서버가 시작할 때와 1시간마다 확인해 `PHOTO_PURGE_AT`(기본 2026-12-31 24:00 KST)이 지나면 `photos` 전부와 사진 폴더를 지운다.
 
 ---
 
@@ -228,11 +285,11 @@ DB에 세션 테이블을 두지 않고, 서버가 서명한 쿠키 하나로 �
 | 공제 문자 원문 | 브라우저 메모리에만 있다. 서버로 보내지 않는다 |
 | 공제 문자 처리본(가린 글) | `/api/extract` 요청으로 받아 OpenAI에 넘기고 결과만 돌려준다. DB·로그에 남기지 않는다 |
 | 치환 대응표(무엇을 무엇으로 바꿨는지) | 브라우저에만 있다. 서버로 보내지 않는다 |
-| 사진 파일(원본·처리본) | 서버로 보내지 않는다. 사진 업로드 API가 없다. 지문(SHA-256)만 보낸다 |
-| 사진 원본 파일명·EXIF·GPS | 파일명은 서버로 보내지 않는다. 처리본은 canvas 재인코딩으로 메타데이터가 빠진 새 파일이다 |
+| 사진 원본 | 서버로 보내지 않는다. 로그인하지 않으면 가린 처리본의 지문(SHA-256)만, 로그인 후 저장하면 가린 처리본만 보낸다(`photos`) |
+| 사진 원본 파일명·EXIF·GPS | 파일명은 서버로 보내지 않는다. 처리본은 canvas 재인코딩으로 메타데이터가 빠진 새 파일이고, 저장할 때 서버가 다시 검사해 메타데이터가 남아 있으면 거절한다 |
 | 이름·주소·호수(문자·내용증명 입력값) | 브라우저 안에서 서식을 채우는 데만 쓴다 |
 | 변호사 찾아보기 조건 | 브라우저 안에서 점수를 계산한다. 서버에는 `lawyer_search` 횟수만 간다 |
-| IP 주소 | 요청 속도 제한(분당 30회, `/api/auth/*`는 분당 10회)을 위해 서버 메모리에 1분간만 둔다. DB·파일에 쓰지 않는다 |
+| IP 주소 | 요청 속도 제한(분당 30회, `/api/auth/*`는 분당 10회, 사진 업로드는 분당 20회)을 위해 서버 메모리에 1분간만 둔다. DB·파일에 쓰지 않는다 |
 | 비밀번호 원문 | 받자마자 scrypt 해시로 바꾸고 원문은 저장·기록하지 않는다 |
 | 구글 계정 이름·프로필 사진·ID 토큰 | 서버가 토큰을 검증하는 데만 쓰고 `sub`·이메일 외에는 저장하지 않는다. 토큰 자체도 저장하지 않는다 |
 | 서버 로그 | `[extract] ok items=5 ms=2310`처럼 건수·소요 시간만. 본문은 쓰지 않는다 |
@@ -245,9 +302,10 @@ DB에 세션 테이블을 두지 않고, 서버가 서명한 쿠키 하나로 �
 |---|---|---|
 | 서버 DB 4개 테이블(`receipts`·`intents`·`survey`·`metrics`) | **2026-12-31까지** | 그날 DB 파일을 일괄 삭제. 요청하면 즉시 삭제(기기 ID 기준) |
 | `users` (FR-10) | **탈퇴할 때까지, 늦어도 2026-12-31** | 탈퇴하면 즉시 행 삭제, 남은 계정은 그날 일괄 삭제 |
+| `photos` + 사진 파일 (FR-10) | **삭제·탈퇴할 때까지, 늦어도 2026-12-31 24:00 KST** | 한 장 삭제 시 파일·행 즉시, 탈퇴 시 회원 폴더·행 즉시, 기한이 지나면 서버가 자동으로 전부 삭제(`PHOTO_PURGE_AT`) |
 | `bj_session` 쿠키 | 30일 | 로그아웃·탈퇴 시 삭제, 만료되면 브라우저가 지움 |
 | 브라우저 저장소 | 사용자가 지울 때까지(`bj_popup_closed`는 탭을 닫을 때까지) | 사용자가 브라우저에서 삭제 |
-| 브라우저 메모리(공제 정리·사진) | 새로고침·탭 닫기까지 | 자동 |
+| 브라우저 메모리(공제 정리·저장하지 않은 사진) | 새로고침·탭 닫기까지 | 자동 |
 
 자세한 내용은 [PRIVACY_LEGAL.md](PRIVACY_LEGAL.md)와 화면 #/privacy를 따른다.
 
@@ -262,6 +320,7 @@ erDiagram
     DEDUCTION_STATE ||--o{ ITEM : "items"
     ITEM }o--o{ REFERENCE : "키워드로 화면에서 연결 (저장 안 함)"
     ROOM_PHOTO }o--o| RECEIPT_RESPONSE : "receipt (sha256로 서버 receipts와 연결)"
+    ROOM_PHOTO }o--o| PHOTOS_SERVER : "serverId (로그인 후 저장한 경우 서버 photos.id)"
     LAWYER_CRITERIA ||--o{ LAWYER_PROFILE : "조건 일치 점수로 최대 3명"
 
     DEDUCTION_STATE {
@@ -291,14 +350,19 @@ erDiagram
         string id PK
         string zone "벽 | 바닥 | 욕실 | 주방 | 창문/문 | 옵션 가전 | 기타"
         string phase "입주 | 퇴실"
-        string url "처리본 object URL (서버로 안 보냄)"
+        string url "로그아웃: 처리본 object URL / 저장됨: /api/photos/id/file"
         string fileName "원본 파일명 - 화면 표시만, 서버로 안 보냄"
         string sha256 "처리본 지문"
         string memo
-        string date "날짜, 없으면 null"
-        string dateSource "exif | manual | none"
         boolean masked "가림 처리본인지"
         int maskCount "가림 상자 수"
+        int serverId "서버 photos.id - 로그인 후 저장한 경우만"
+    }
+    PHOTOS_SERVER {
+        int id "서버 photos.id"
+        string url "/api/photos/id/file (본인만, 공개 링크 아님)"
+        string receivedAt "서버 수신 시각"
+        string sig "HMAC 서명"
     }
     RECEIPT_RESPONSE {
         string sha256
@@ -436,7 +500,7 @@ erDiagram
 
 ## 7. 향후(창업 목표) 데이터 모델 — 아직 구현하지 않음
 
-이사 건 단위 보관·기록북 재다운로드·결제를 붙일 때의 초안이다. 회원 계정 자체는 FR-10 `users`로 먼저 만들었고, 아래는 그 계정에 보관 데이터를 붙이는 단계다.
+이사 건 단위 보관·기록북 재다운로드·결제를 붙일 때의 초안이다. 회원 계정 자체는 FR-10 `users`로, 가린 사진 처리본 보관은 `photos`(2026-12-31까지, 이사 건 구분 없음)로 먼저 만들었고, 아래는 그 계정에 이사 건·결제를 붙이는 단계다.
 
 ```mermaid
 erDiagram

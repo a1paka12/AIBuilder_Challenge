@@ -1,9 +1,13 @@
 /*
  * 개인정보 가리기 대화상자 (PRD FR-01 사진 부분)
  * 1 / 2 "개인정보 가리기": 사진 위에 불투명 가림 상자 — 포인터 드래그로 그리기 + 키보드 대안(상자 추가·화살표 이동·크기 버튼·삭제)
- * 2 / 2 "전송본 확인": 처리본 미리보기 + "서버로 보내는 것: 지문 64자뿐" + 실제 지문 값 → [확인하고 기록하기]
+ * 2 / 2 "전송본 확인": 처리본 미리보기 + 서버로 보내는 것 안내 + 실제 지문 값
+ *   - 로그아웃(기본): "서버로 보내는 것: 지문 64자뿐" → [확인하고 기록하기]
+ *   - 로그인(save 있음): "서버로 보내는 것: 가린 처리본 사진(메타데이터 제거됨) · 로그인한 내 계정에만 보관"
+ *     + 처음이면 [필수] 서버 보관 동의 체크 → [확인하고 기록하기]
  *
- * 이 파일은 api.ts 를 불러오지 않는다. 네트워크 호출이 없고, [확인하고 기록하기] 를 눌렀을 때만 onConfirm 으로 처리본을 넘긴다.
+ * 이 파일은 api.ts 를 불러오지 않는다. 네트워크 호출이 없고, 확인 버튼을 눌렀을 때만 onConfirm 으로 처리본을 넘긴다.
+ * onConfirm 이 Promise 를 돌려주면 끝날 때까지 "저장하는 중", 실패하면 대화상자를 연 채로 오류를 보여 준다(처리본은 그대로).
  * 접근성: role=dialog·aria-modal·포커스 가둠·Esc(=취소)·닫으면 포커스 복귀, canvas 에 aria-label, 상자 추가·이동·크기·삭제는 aria-live 로 알림.
  */
 import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type RefObject } from 'react'
@@ -22,9 +26,29 @@ import {
 } from '../../lib/imageMask'
 import { useModalA11y } from './useModalA11y'
 
-/** [확인하고 기록하기] 결과 — 처리본 + 미리보기 object URL(소유권이 호출한 쪽으로 넘어간다) */
+/** 확인 버튼 결과 — 처리본 + 미리보기 object URL(성공하면 소유권이 호출한 쪽으로 넘어간다) */
 export interface ConfirmedTransfer extends MaskedImage {
   url: string
+}
+
+/** onConfirm 이 던지면 대화상자에 message 를 보여 준다. redo=true 면 [다시 가리기]를 권한다 (예: 서버가 메타데이터를 찾음) */
+export class TransferError extends Error {
+  redo: boolean
+  /** 동의를 다시 받아야 하는 경우 (서버가 동의 없음으로 거절) */
+  needConsent: boolean
+  constructor(message: string, opts: { redo?: boolean; needConsent?: boolean } = {}) {
+    super(message)
+    this.redo = !!opts.redo
+    this.needConsent = !!opts.needConsent
+  }
+}
+
+/** 서버 저장 모드 설정 — 있으면 확인 화면 문구·버튼이 "서버에 저장"으로 바뀐다 */
+export interface SaveMode {
+  /** 처음 저장이라 서버 보관 동의가 필요한지 */
+  consentNeeded: boolean
+  /** 동의 문구에 넣을 보관 방침 */
+  retention: string
 }
 
 export interface MaskEditorProps {
@@ -33,8 +57,10 @@ export interface MaskEditorProps {
   label: string
   /** 닫기·취소·Esc — 사진 추가 자체를 취소한다 */
   onCancel: () => void
-  /** [확인하고 기록하기] 를 눌렀을 때만 불린다 */
-  onConfirm: (result: ConfirmedTransfer) => void
+  /** 확인 버튼을 눌렀을 때만 불린다. consent=true 면 사용자가 이번에 [필수] 서버 보관 동의에 체크했다 */
+  onConfirm: (result: ConfirmedTransfer, opts: { consent: boolean }) => void | Promise<void>
+  /** 로그인 사용자의 서버 저장 모드 (없으면 지문만 기록) */
+  save?: SaveMode
   /** 닫힌 뒤 포커스를 돌려줄 요소 (예: [사진 추가] 버튼) */
   returnFocusRef?: RefObject<HTMLElement | null>
 }
@@ -61,11 +87,12 @@ function CloseIcon() {
   )
 }
 
-export default function MaskEditor({ file, label, onCancel, onConfirm, returnFocusRef }: MaskEditorProps) {
+export default function MaskEditor({ file, label, onCancel, onConfirm, returnFocusRef, save }: MaskEditorProps) {
   const uid = useId()
   const titleId = `${uid}-title`
   const descId = `${uid}-desc`
   const kbdId = `${uid}-kbd`
+  const consentId = `${uid}-consent`
 
   const [step, setStep] = useState<Step>('mask')
   const [img, setImg] = useState<HTMLImageElement | null>(null)
@@ -77,13 +104,24 @@ export default function MaskEditor({ file, label, onCancel, onConfirm, returnFoc
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<{ image: MaskedImage; url: string } | null>(null)
   const [live, setLive] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<{ message: string; redo: boolean } | null>(null)
+  const [consentChecked, setConsentChecked] = useState(false)
+  const [consentAsked, setConsentAsked] = useState(false)
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const titleRef = useRef<HTMLHeadingElement>(null)
   const dragRef = useRef<Drag | null>(null)
   // 처리본 미리보기 object URL — 확인하면 소유권을 넘기고, 아니면 이 대화상자가 해제한다
   const ownedUrlRef = useRef<string | null>(null)
-  const { dialogRef, onKeyDown } = useModalA11y<HTMLDivElement>(onCancel, titleRef, returnFocusRef)
+  const consentRef = useRef<HTMLInputElement>(null)
+  const aliveRef = useRef(true)
+  // 저장 요청 중에는 Esc·닫기로 취소하지 않는다 (보내는 중인 처리본과 화면이 어긋나지 않게)
+  const savingRef = useRef(false)
+  const guardedCancel = () => {
+    if (!savingRef.current) onCancel()
+  }
+  const { dialogRef, onKeyDown } = useModalA11y<HTMLDivElement>(guardedCancel, titleRef, returnFocusRef)
 
   const announce = (msg: string) => setLive(msg)
 
@@ -103,13 +141,14 @@ export default function MaskEditor({ file, label, onCancel, onConfirm, returnFoc
   }, [file])
 
   // 언마운트: 아직 넘기지 않은 미리보기 URL 해제
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    aliveRef.current = true
+    return () => {
+      aliveRef.current = false
       if (ownedUrlRef.current) URL.revokeObjectURL(ownedUrlRef.current)
       ownedUrlRef.current = null
-    },
-    [],
-  )
+    }
+  }, [])
 
   // 단계가 바뀌면 제목으로 포커스
   useEffect(() => {
@@ -346,14 +385,44 @@ export default function MaskEditor({ file, label, onCancel, onConfirm, returnFoc
     if (ownedUrlRef.current) URL.revokeObjectURL(ownedUrlRef.current)
     ownedUrlRef.current = null
     setResult(null)
+    setSaveError(null)
     setStep('mask')
   }
 
-  // 유일한 확인 경로 — 처리본과 지문, 미리보기 URL 의 소유권을 넘긴다
-  const confirm = () => {
-    if (!result) return
+  const showConsent = !!save && (save.consentNeeded || consentAsked)
+
+  // 유일한 확인 경로 — 처리본과 지문, 미리보기 URL 의 소유권을 넘긴다 (실패하면 되찾는다)
+  const confirm = async () => {
+    if (!result || savingRef.current) return
+    if (showConsent && !consentChecked) {
+      setSaveError({ message: '서버에 저장하려면 [필수] 서버 보관 동의에 체크해 주세요. 동의하지 않으면 아무것도 보내지 않아요.', redo: false })
+      announce('동의가 필요해요. 아직 보내지 않았어요')
+      consentRef.current?.focus()
+      return
+    }
+    const handed = result.url
     ownedUrlRef.current = null
-    onConfirm({ ...result.image, url: result.url })
+    setSaveError(null)
+    savingRef.current = true
+    setSaving(true)
+    if (save) announce('처리본을 서버에 저장하는 중이에요')
+    try {
+      await onConfirm({ ...result.image, url: handed }, { consent: showConsent && consentChecked })
+    } catch (err) {
+      if (!aliveRef.current) return
+      ownedUrlRef.current = handed
+      const te = err instanceof TransferError ? err : null
+      const message = te?.message || (err instanceof Error && err.message) || '저장하지 못했어요. 잠시 후 다시 시도해 주세요.'
+      if (te?.needConsent) {
+        setConsentAsked(true)
+        setConsentChecked(false)
+      }
+      setSaveError({ message, redo: !!te?.redo })
+      announce(`저장하지 못했어요. ${message}`)
+    } finally {
+      savingRef.current = false
+      if (aliveRef.current) setSaving(false)
+    }
   }
 
   const canvasLabel = `${label} 사진 미리보기 · 가림 상자 ${rects.length}개${selectedName ? ` · ${selectedName} 선택됨` : ''}`
@@ -370,7 +439,7 @@ export default function MaskEditor({ file, label, onCancel, onConfirm, returnFoc
               <span className="muted small mk-title-sub"> · {label}</span>
             </h2>
           </div>
-          <button type="button" className="mk-x" aria-label="닫기 (사진 추가 취소)" onClick={onCancel}>
+          <button type="button" className="mk-x" aria-label="닫기 (사진 추가 취소)" onClick={guardedCancel} disabled={saving}>
             <CloseIcon />
           </button>
         </header>
@@ -380,7 +449,7 @@ export default function MaskEditor({ file, label, onCancel, onConfirm, returnFoc
             <>
               <p id={descId} className="mk-guide">
                 택배 송장, 우편물의 이름·주소, 얼굴, 호수(문패), 차 번호처럼 개인정보가 보이는 곳을 가려 주세요. 가린 곳은 되돌릴 수 없는{' '}
-                <b>불투명 상자</b>로 칠해지고, 처리본은 사진 정보(EXIF·GPS 등 메타데이터)가 지워진 <b>새 파일</b>이에요. 원본은 이 기기 밖으로 나가지 않아요.
+                <b>불투명 상자</b>로 칠해지고, 처리본은 촬영 날짜·위치(GPS) 같은 사진 속 메타데이터를 모두 지운 <b>새 파일</b>이에요. 날짜는 사진에서 읽지 않고 서버 기록 시각을 써요. 원본은 이 기기 밖으로 나가지 않아요.
               </p>
               <div className="mk-work" onKeyDown={onWorkKeyDown}>
                 <div className="mk-stage">
@@ -464,7 +533,15 @@ export default function MaskEditor({ file, label, onCancel, onConfirm, returnFoc
             result && (
               <div className="mk-result">
                 <p id={descId} className="mk-guide">
-                  아래가 <b>실제 전송본의 바탕이 되는 처리본</b>이에요. 기록북에는 이 처리본만 쓰고, 서버에는 이 파일의 지문만 남겨요.
+                  {save ? (
+                    <>
+                      아래가 <b>실제로 서버에 보낼 처리본</b>이에요. 가린 상자와 메타데이터 제거가 끝난 이 파일만 내 계정에 보관하고, 기록북에도 이 처리본만 써요.
+                    </>
+                  ) : (
+                    <>
+                      아래가 <b>실제 전송본의 바탕이 되는 처리본</b>이에요. 기록북에는 이 처리본만 쓰고, 서버에는 이 파일의 지문만 남겨요.
+                    </>
+                  )}
                 </p>
                 <figure className="mk-preview">
                   <img src={result.url} alt={`처리본 미리보기 — 가림 상자 ${out.maskCount}개, 메타데이터 제거됨`} />
@@ -479,17 +556,35 @@ export default function MaskEditor({ file, label, onCancel, onConfirm, returnFoc
                   </span>
                   {out.downscaled && <span className="muted small">긴 변을 2,400px로 줄였어요</span>}
                 </div>
-                <div className="notice mk-notice">
-                  <p>
-                    <strong>서버로 보내는 것:</strong> 이 처리본의 지문(SHA-256) 64자뿐이에요. 사진 자체는 보내지 않아요.
+                {save && showConsent && (
+                  <div className={`mk-consent${saveError && !consentChecked ? ' is-error' : ''}`}>
+                    <input
+                      ref={consentRef}
+                      id={consentId}
+                      type="checkbox"
+                      checked={consentChecked}
+                      required
+                      aria-required="true"
+                      disabled={saving}
+                      onChange={(e) => {
+                        setConsentChecked(e.target.checked)
+                        if (e.target.checked) setSaveError(null)
+                      }}
+                    />
+                    <label htmlFor={consentId}>
+                      <span className="badge warn">필수</span> 가린 사진을 서버(일본 도쿄)에 보관하는 데 동의해요 — {save.retention}
+                    </label>
+                  </div>
+                )}
+                {saveError && (
+                  <p className="error-text mk-save-error" role="alert">
+                    {saveError.message}
                   </p>
-                  <details className="mk-fp">
-                    <summary>지문 값 보기 (64자)</summary>
-                    <code className="mk-fp-value num">{out.sha256}</code>
-                  </details>
-                </div>
+                )}
                 <p className="muted small mk-fine">
-                  [확인하고 기록하기]를 누르기 전에는 아무것도 보내지 않아요. 누르면 처리본이 기록북에 추가되고, 지문만 서버에 기록돼요. 원본 파일은 이 기기 밖으로 나가지 않았어요.
+                  {save
+                    ? '[확인하고 기록하기]를 누르면 가린 사진을 내 계정에 저장해요. 원본 사진은 이 기기 밖으로 나가지 않아요.'
+                    : '[확인하고 기록하기]를 누르기 전에는 아무것도 보내지 않아요. 원본 사진은 이 기기 밖으로 나가지 않아요.'}
                 </p>
               </div>
             )
@@ -497,7 +592,7 @@ export default function MaskEditor({ file, label, onCancel, onConfirm, returnFoc
         </div>
 
         <footer className="mk-foot">
-          <button type="button" className="btn ghost" onClick={onCancel}>
+          <button type="button" className="btn ghost" onClick={guardedCancel} disabled={saving}>
             취소
           </button>
           {step === 'mask' ? (
@@ -506,11 +601,11 @@ export default function MaskEditor({ file, label, onCancel, onConfirm, returnFoc
             </button>
           ) : (
             <>
-              <button type="button" className="btn" onClick={backToMask}>
+              <button type="button" className={saveError?.redo ? 'btn primary' : 'btn'} onClick={backToMask} disabled={saving}>
                 다시 가리기
               </button>
-              <button type="button" className="btn primary" onClick={confirm} disabled={!result}>
-                확인하고 기록하기
+              <button type="button" className={saveError?.redo ? 'btn' : 'btn primary'} onClick={() => void confirm()} disabled={!result} aria-disabled={saving} aria-busy={saving}>
+                {save && saving ? '저장하는 중…' : '확인하고 기록하기'}
               </button>
             </>
           )}

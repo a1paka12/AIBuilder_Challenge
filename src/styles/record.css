@@ -86,7 +86,6 @@
   transition: border-color 0.12s, background-color 0.12s;
 }
 .rc-drop.is-dragging { border-color: var(--primary); background: var(--primary-soft); }
-.rc-drop.is-busy { cursor: progress; }
 /* 호버는 마우스 기기에서만 (터치에서 눌린 상태가 남지 않게) */
 @media (hover: hover) {
   .rc-chips label:hover { border-color: var(--primary); color: var(--primary); }
@@ -102,12 +101,6 @@
 .rc-drop-btn { min-width: 168px; }
 .rc-drop .small { margin: 0; }
 .record-file { display: none; }
-.rc-spin {
-  display: inline-block; width: 16px; height: 16px; border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.4); border-top-color: #fff;
-  animation: rc-spin 0.8s linear infinite;
-}
-@keyframes rc-spin { to { transform: rotate(360deg); } }
 .error-text { color: var(--danger); font-size: 13px; font-weight: 600; margin: 0; }
 
 /* ── 구역별 사진 카드 ───────────────────── */
@@ -121,8 +114,10 @@
 .photo-body { padding: 12px; display: grid; gap: 10px; }
 .photo-badges { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; min-width: 0; }
 .photo-file { flex: 1 1 100px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.photo-date { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; font-size: 14px; }
+.photo-date { margin: 0; display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: baseline; font-size: 14px; }
+.photo-date-label { font-size: 13px; font-weight: 600; color: var(--muted); }
 .photo-date-value { font-weight: 700; font-variant-numeric: tabular-nums; }
+.photo-date-value.none { font-weight: 400; color: var(--muted); }
 .photo-field { display: grid; gap: 4px; }
 .photo-field label { font-size: 13px; font-weight: 600; color: var(--muted); }
 .photo-receipt:empty { display: none; }
@@ -220,7 +215,6 @@
   .rc-meter-fill, .rc-drop, .rc-opt label { transition: none; }
   .photo-card { animation: none; }
   .rc-chips label:active { transform: none; }
-  .rc-spin { animation-duration: 1.6s; }
 }
 
 /* ── 인쇄: 기록북 영역만 ───────────────────── */
@@ -358,4 +352,59 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .mk-x, .mk-box-btn { transition: none; }
+}
+
+/* ══ 로그인 사용자 서버 보관 (2026-10-03 추가) ══ */
+
+/* 로그아웃 안내: 로그인하면 서버에 저장 */
+.rc-login-cta {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 14px;
+  border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface);
+}
+.rc-login-cta p { margin: 0; flex: 1 1 240px; min-width: 0; font-size: 14px; font-weight: 600; line-height: 1.5; }
+.rc-login-btn { flex: none; min-height: 44px; display: inline-flex; align-items: center; text-decoration: none; }
+
+/* 저장된 사진 불러오기 상태 */
+.rc-load { margin: -6px 0 12px; }
+.rc-load-error {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 14px; padding: 10px 14px;
+  border: 1px solid #f3c2bd; border-radius: var(--radius-sm); background: var(--danger-bg);
+}
+.rc-load-error .error-text { margin: 0; flex: 1 1 220px; min-width: 0; }
+
+/* 사진 카드: 서버 저장 배지 */
+.photo-store { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 0; }
+.store-badge { display: inline-flex; align-items: center; gap: 4px; }
+.store-badge svg { flex: none; }
+.memo-state { display: block; min-height: 1.4em; margin-top: 4px; }
+
+/* 전송본 확인: [필수] 서버 보관 동의 */
+.mk-consent {
+  display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px;
+  border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface);
+}
+.mk-consent.is-error { border-color: var(--danger); box-shadow: inset 0 0 0 1px var(--danger); }
+.mk-consent input { flex: none; width: 22px; height: 22px; margin: 1px 0 0; accent-color: var(--primary); cursor: pointer; }
+.mk-consent input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.mk-consent label { cursor: pointer; font-size: 14px; font-weight: 600; line-height: 1.55; }
+.mk-consent .badge { margin-right: 4px; vertical-align: 1px; }
+.mk-save-error { margin: 0; }
+
+/* 무료 체험 vs 기록북(가격 가설) 비교 */
+.rc-plan { margin: 8px 0 12px; }
+.rc-plan-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.rc-plan-table caption { text-align: left; font-weight: 700; padding: 0 0 6px; font-size: 14px; }
+.rc-plan-table th, .rc-plan-table td { padding: 8px 10px; border-bottom: 1px solid var(--line, #e5e7eb); text-align: left; vertical-align: top; }
+.rc-plan-table thead th { font-weight: 700; white-space: nowrap; }
+.rc-plan-table tbody th { font-weight: 600; }
+.rc-plan-cards { display: none; }
+@media (max-width: 560px) {
+  .rc-plan-table { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .rc-plan-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .rc-plan-card { border: 1px solid var(--line, #e5e7eb); border-radius: 10px; padding: 10px; min-width: 0; }
+  .rc-plan-card-head { font-weight: 700; margin-bottom: 6px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+  .rc-plan-card dl { margin: 0; }
+  .rc-plan-card dl > div { padding: 4px 0; border-top: 1px solid var(--line, #e5e7eb); }
+  .rc-plan-card dt { font-size: 12px; color: var(--muted, #6b7280); }
+  .rc-plan-card dd { margin: 0; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
 }

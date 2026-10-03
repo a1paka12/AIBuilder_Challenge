@@ -4,13 +4,13 @@ import { usePromoUnlocked } from '../../lib/promo'
 import { go } from '../../router'
 
 /*
- * 이벤트 띠 배너 — 출시 기념 30초 설문 이벤트로 안내한다.
+ * 이벤트 띠 배너 — 출시 기념 30초 설문 이벤트로 안내한다(첫 화면 맨 아래). 설문 자체는 이벤트 화면(#/event)에 있다.
  * 참여 수는 GET /api/stats 의 survey.total 실제 값만, 1 이상일 때만 보여 준다(0이면 숨김 · 못 불러와도 숨김).
  * 이 기기에서 이미 혜택이 적용됐으면(usePromoUnlocked) 문구와 버튼이 '기록북 만들기'로 바뀐다.
  */
 const n = (v: number) => v.toLocaleString('ko-KR')
 
-export default function EventBand({ onSurvey }: { onSurvey: () => void }) {
+export default function EventBand() {
   const unlocked = usePromoUnlocked()
   const [total, setTotal] = useState(0)
 
@@ -55,14 +55,9 @@ export default function EventBand({ onSurvey }: { onSurvey: () => void }) {
             </button>
           </>
         ) : (
-          <>
-            <button type="button" className="btn home-band-primary" onClick={() => go('event')}>
-              이벤트 자세히 보기
-            </button>
-            <button type="button" className="btn home-band-ghost" onClick={onSurvey}>
-              바로 설문 답하기
-            </button>
-          </>
+          <button type="button" className="btn home-band-primary" onClick={() => go('event')}>
+            이벤트 보고 설문 답하기
+          </button>
         )}
       </div>
     </section>

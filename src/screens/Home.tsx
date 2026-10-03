@@ -1,17 +1,18 @@
 import HeroPreview from '../components/home/HeroPreview'
-import ServiceGuide from '../components/home/ServiceGuide'
 import EventBand from '../components/home/EventBand'
 import { TaskIcon } from '../components/home/icons'
 import { go } from '../router'
 import TrustBadges from '../components/TrustBadges'
 import ServiceMarks from '../components/ServiceMarks'
-import Survey from '../components/Survey'
 import '../styles/home.css'
 
 /*
  * 첫 화면 (#/) — 은행·공공 누리집 첫 화면 꼴
- * 메인 비주얼(제목 · 보조 문장 · 버튼 4개 · 공제 문자→정리 표 그림) → 서비스 원칙 마크 줄 → 이렇게 진행돼요(4단계, AI/내가)
- * → 업무별 안내(무엇을 / AI가 하는 일 / 내가 하는 일 / 비용 / 자세히 보기) → 이용 안내 → 이벤트 띠 → 보증금 지킴이의 약속 → 30초 현장 설문
+ * 메인 비주얼(제목 · 보조 문장 · 버튼 4개 · 사실 3줄 · 무료/유료 한 줄 · 공제 문자→정리 표 그림) → 서비스 원칙 마크 줄
+ * → 이렇게 진행돼요(4단계, AI/내가) (+ "업무별 안내는 고객센터에서" 한 줄) → 보증금 지킴이의 약속 → 출시 기념 이벤트 띠
+ * 업무별 안내와 이용 안내(정보 제공 도구 · AI 사용 고지 · 무료/유료)는 고객센터 화면(#/support)으로 옮겼다.
+ * PRD 7절(첫 화면: 서비스 소개 · 무료 기능과 기록북 상품 · AI 사용 안내)은 메인 비주얼의 무료/유료 한 줄과
+ * "AI는 정리만, 판단은 하지 않아요" 문구가 맡는다. 30초 설문은 이벤트 화면(#/event)에 있다.
  * 업무 바로가기는 모든 화면 공통으로 헤더 바로 아래 아이콘 줄(App.tsx TaskNav)에 있다.
  * h1 은 메인 비주얼 제목 하나. 레이어 팝업(PromoPopup)은 App 에서 route==='home' 일 때만 띄운다(이 파일이 아님).
  * 자동 넘김 캐러셀 없음(정적 한 장). 숫자는 PRD 예시·가격 가설·/api/stats 실제 값만.
@@ -25,24 +26,6 @@ const STEPS: { who: 'me' | 'ai'; title: string; desc: string }[] = [
   { who: 'me', title: '확인하고 물어볼 항목 체크', desc: '표를 원문과 견주어 확인한 뒤, 근거를 물어볼 항목만 골라요.' },
   { who: 'me', title: '문의 문자 복사', desc: '고정 서식의 문의 문자를 복사해 집주인에게 직접 보내요.' },
 ]
-
-const NOTES = [
-  { title: '정보 제공 도구', body: '보증금 지킴이는 공개 자료를 찾아 보여 주는 정보 제공 도구이며, 법률 판단이나 대리를 하지 않습니다.' },
-  { title: 'AI 사용 안내', body: '공제 문자 정리에만 생성형 AI를 사용하고, AI가 정리한 결과에는 AI 표시를 붙여요. 다른 업무는 AI를 쓰지 않아요.' },
-  {
-    title: '무료 / 유료',
-    body: '공제 정리·참고 자료·문의 문자·변호사 조건 추천(가상 프로필 시연)은 무료예요. 방 상태 기록북(4,900원)과 내용증명 서식 PDF(2,900원)는 유료 상품 가설이고, 결제는 아직 연결하지 않았어요.',
-  },
-]
-
-/** 화면 안의 요소로 이동 — 해시 라우팅이라 #anchor 링크 대신 스크롤 + 포커스 이동 */
-function jumpTo(id: string) {
-  const el = document.getElementById(id)
-  if (!el) return
-  const reduce = !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-  el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
-  el.focus({ preventScroll: true })
-}
 
 export default function Home() {
   return (
@@ -84,6 +67,11 @@ export default function Home() {
               </li>
             ))}
           </ul>
+          <p className="home-plan">
+            <span className="home-plan-tag">무료</span> 공제 정리·문의 문자·변호사 조건 추천
+            <span className="home-plan-sep" aria-hidden="true">·</span>
+            <span className="home-plan-tag is-paid">유료</span> 기록북 4,900원(가격 가설·결제 미연결)
+          </p>
         </div>
         <div className="home-hero-visual">
           <HeroPreview />
@@ -112,34 +100,18 @@ export default function Home() {
             </li>
           ))}
         </ol>
+        <p className="home-support-more">
+          업무별 안내는 고객센터에서 볼 수 있어요{' '}
+          <button type="button" className="linklike" onClick={() => go('support')}>
+            고객센터<span aria-hidden="true">&nbsp;→</span>
+          </button>
+        </p>
       </section>
-
-      {/* 3) 아래 상세 — 업무별 안내 */}
-      <ServiceGuide />
-
-      {/* 이용 안내 (정보 제공 도구 · AI 사용 고지 · 무료/유료) */}
-      <section className="home-notes" aria-labelledby="home-notes-title">
-        <div className="section-head">
-          <h2 id="home-notes-title">이용 안내</h2>
-        </div>
-        <ul className="notice-list">
-          {NOTES.map((nt) => (
-            <li key={nt.title} className="notice">
-              <strong>{nt.title}</strong>
-              <span>{nt.body}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      {/* 4) 이벤트 띠 → 약속 → 설문 */}
-      <EventBand onSurvey={() => jumpTo('home-survey')} />
 
       <TrustBadges />
 
-      <div id="home-survey" className="home-survey" tabIndex={-1}>
-        <Survey />
-      </div>
+      {/* 출시 기념 이벤트 띠 — 맨 아래 */}
+      <EventBand />
     </div>
   )
 }

@@ -11,13 +11,14 @@ import Event from './screens/Event'
 import Help from './screens/Help'
 import Lawyers from './screens/Lawyers'
 import Signup from './screens/Signup'
+import Support from './screens/Support'
 import PromoPopup from './components/PromoPopup'
 import FooterCompliance from './components/FooterCompliance'
 import ServiceMarks from './components/ServiceMarks'
 import { COMPANY } from './data/company'
 import { useMe } from './lib/auth'
 import { HOME_TASKS } from './components/home/tasks'
-import { TaskIcon } from './components/home/icons'
+import { TaskIcon, type TaskIconName } from './components/home/icons'
 import './styles/shell.css'
 import './styles/signup.css'
 
@@ -67,6 +68,8 @@ function Screen() {
       return <Lawyers />
     case 'signup':
       return <Signup />
+    case 'support':
+      return <Support />
     default:
       return <Home />
   }
@@ -158,8 +161,9 @@ function AccountLink({ active }: { active: boolean }) {
 /*
  * 업무 바로가기 — 헤더 바로 아래 아이콘 줄. 순서·아이콘은 첫 화면 업무 목록(home/tasks.ts)과 같다.
  * 보이는 이름은 짧게(2~4글자), 화면낭독기에는 뒤에 나머지 이름을 이어 읽힌다(보이는 글자가 접근 이름의 앞에 오도록).
+ * 고객센터는 업무 목록에 없어 아이콘(헤드셋)을 직접 적는다 — 맨 끝.
  */
-const TASK_NAV: { route: Route; short: string; more: string }[] = [
+const TASK_NAV: { route: Route; short: string; more: string; icon?: TaskIconName }[] = [
   { route: 'deduct', short: '공제', more: ' 문자 정리' },
   { route: 'record', short: '기록', more: ' (방 상태 기록)' },
   { route: 'lawyer', short: '변호사', more: ' 찾아보기' },
@@ -167,6 +171,7 @@ const TASK_NAV: { route: Route; short: string; more: string }[] = [
   { route: 'cert', short: '내용증명', more: ' 서식' },
   { route: 'event', short: '이벤트', more: ' (출시 기념)' },
   { route: 'pricing', short: '가격', more: ' 안내' },
+  { route: 'support', short: '고객센터', more: ' (업무별 안내·문의)', icon: 'headset' },
 ]
 const TASK_ICON = new Map(HOME_TASKS.map((t) => [t.route, t.icon]))
 
@@ -221,7 +226,7 @@ function TaskNav({ route }: { route: Route }) {
       >
         <ul className="tasknav-list">
           {TASK_NAV.map((t) => {
-            const icon = TASK_ICON.get(t.route)
+            const icon = t.icon ?? TASK_ICON.get(t.route)
             return (
               <li key={t.route}>
                 <a className="tasknav-item" href={hrefOf(t.route)} aria-current={route === t.route ? 'page' : undefined}>
@@ -337,6 +342,9 @@ function Footer() {
               <IconExternal className="footer-ext" />
             </a>
             <p className="footer-cs-note">{COMPANY.contactNote}</p>
+            <a className="footer-cs-more" href={hrefOf('support')} aria-current={current('support')}>
+              고객센터 바로가기
+            </a>
           </section>
         </div>
 

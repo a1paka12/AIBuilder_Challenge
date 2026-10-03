@@ -2,6 +2,7 @@
 // - POST /api/extract : 공제 메시지 텍스트 → 항목·청구액·원문 인용 (OpenAI 구조화 출력)
 // - POST /api/receipt : 사진 파일 지문(SHA-256)만 받아 서버 기록 시각을 남김 (사진은 받지 않음)
 // - GET  /api/receipt/:sha256 : 기록 확인
+// - /api/photos : 로그인+보관 동의 후 처리본(가림·메타데이터 제거) 사진 서버 보관 — 본인만 조회, 삭제·탈퇴 즉시 삭제, 2026-12-31 일괄 삭제
 // - POST /api/intent, /api/survey, /api/metric · GET /api/stats : 구매 의향·현장 설문·익명 집계 (SQLite)
 // - GET  /api/health
 // 원칙: 공제 메시지 본문은 저장·로그하지 않는다. AI는 옮겨 적기만 하고 판단하지 않는다.
@@ -79,7 +80,24 @@ CREATE TABLE IF NOT EXISTS users (
   created_at      TEXT NOT NULL,
   last_login_at   TEXT NOT NULL
 );
+-- 사진: 기기에서 가리기·메타데이터 제거를 마친 처리본만 받는다. 파일은 DATA_DIR/photos/<user_id>/<id>.jpg|png
+CREATE TABLE IF NOT EXISTS photos (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id     INTEGER NOT NULL,
+  sha256      TEXT NOT NULL,
+  mime        TEXT NOT NULL CHECK (mime IN ('image/jpeg', 'image/png')),
+  bytes       INTEGER NOT NULL,
+  zone        TEXT NOT NULL,
+  phase       TEXT NOT NULL,
+  memo        TEXT NOT NULL DEFAULT '',
+  received_at TEXT NOT NULL,
+  sig         TEXT NOT NULL,
+  UNIQUE (user_id, sha256)
+);
 `)
+if (!db.prepare('PRAGMA table_info(users)').all().some((c) => c.name === 'photo_consent_at')) {
+  db.exec('ALTER TABLE users ADD COLUMN photo_consent_at TEXT NULL')
+}
 const PRICES = { book: 4900, cert: 2900 }
 const METRIC_EVENTS = new Set(['extract_ok', 'copy_message', 'cert_pdf', 'book_pdf', 'receipt', 'popup_event', 'popup_help', 'lawyer_search'])
 const kstDay = () => new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10)
@@ -501,8 +519,264 @@ app.post('/api/auth/logout', (req, res) => {
 
 app.delete('/api/me', (req, res) => {
   const u = sessionUser(req)
-  if (u) delUser.run(u.id)
+  if (u) {
+    deleteUserPhotos(u.id)
+    delUser.run(u.id)
+  }
   clearSession(req, res)
+  return res.json({ ok: true })
+})
+
+// ── 사진 서버 보관 (로그인 + 사진 보관 동의 필수) ─────────────────────────────
+// 원칙: 가리기·메타데이터 제거를 마친 처리본만 받는다(메타데이터 남은 파일은 거절). 공개 링크 없음.
+// 보유: 삭제·탈퇴 시 즉시 삭제, 늦어도 PHOTO_PURGE_AT(기본 2026-12-31 24:00 KST)에 일괄 삭제.
+const PHOTOS_DIR = path.join(DATA_DIR, 'photos')
+const PHOTO_LIMIT = 30
+const PHOTO_MAX_BYTES = 6 * 1024 * 1024
+const PHOTO_PHASES = new Set(['입주', '퇴실'])
+const PHOTO_ZONE_MAX = 40
+const PHOTO_MEMO_MAX = 300
+const PHOTO_PURGE_AT = Date.parse(process.env.PHOTO_PURGE_AT || '2026-12-31T15:00:00Z')
+const PHOTO_EXT = { 'image/jpeg': 'jpg', 'image/png': 'png' }
+fs.mkdirSync(PHOTOS_DIR, { recursive: true })
+
+const updPhotoConsent = db.prepare('UPDATE users SET photo_consent_at = ? WHERE id = ?')
+const selPhotoConsent = db.prepare('SELECT photo_consent_at FROM users WHERE id = ?')
+const selPhotos = db.prepare('SELECT * FROM photos WHERE user_id = ? ORDER BY received_at, id')
+const selPhoto = db.prepare('SELECT * FROM photos WHERE id = ? AND user_id = ?')
+const selPhotoBySha = db.prepare('SELECT * FROM photos WHERE user_id = ? AND sha256 = ?')
+const cntPhotos = db.prepare('SELECT COUNT(*) AS n FROM photos WHERE user_id = ?')
+const insPhoto = db.prepare(`INSERT INTO photos (user_id, sha256, mime, bytes, zone, phase, memo, received_at, sig)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+const updPhoto = db.prepare('UPDATE photos SET memo = ?, zone = ?, phase = ? WHERE id = ? AND user_id = ?')
+const delPhoto = db.prepare('DELETE FROM photos WHERE id = ? AND user_id = ?')
+const delPhotosOfUser = db.prepare('DELETE FROM photos WHERE user_id = ?')
+const delAllPhotos = db.prepare('DELETE FROM photos')
+
+const userPhotoDir = (userId) => path.join(PHOTOS_DIR, String(Number(userId)))
+const photoFile = (p) => path.join(userPhotoDir(p.user_id), `${p.id}.${PHOTO_EXT[p.mime]}`)
+const publicPhoto = (p) => ({
+  id: p.id,
+  sha256: p.sha256,
+  mime: p.mime,
+  zone: p.zone,
+  phase: p.phase,
+  memo: p.memo,
+  receivedAt: p.received_at,
+  sig: p.sig,
+  url: `/api/photos/${p.id}/file`,
+})
+
+function deleteUserPhotos(userId) {
+  delPhotosOfUser.run(userId)
+  fs.rmSync(userPhotoDir(userId), { recursive: true, force: true })
+}
+
+// 보유 기한이 지나면 전부 삭제 (시작 시 + 1시간마다 확인)
+function purgeExpiredPhotos() {
+  if (!Number.isFinite(PHOTO_PURGE_AT) || Date.now() < PHOTO_PURGE_AT) return
+  const n = delAllPhotos.run().changes
+  for (const name of fs.readdirSync(PHOTOS_DIR)) fs.rmSync(path.join(PHOTOS_DIR, name), { recursive: true, force: true })
+  if (n) console.log(`[photos] retention purge removed=${n}`)
+}
+purgeExpiredPhotos()
+setInterval(purgeExpiredPhotos, 3600_000).unref()
+
+// 업로드 전용 속도 제한 (IP당 분당 20회)
+const photoHits = new Map()
+function photoRateLimit(req, res, next) {
+  const ip = req.ip || 'unknown'
+  const now = Date.now()
+  const arr = (photoHits.get(ip) || []).filter((t) => now - t < 60_000)
+  if (arr.length >= 20) return res.status(429).json({ error: 'rate_limited', message: '요청이 너무 많아요. 잠시 후 다시 시도해 주세요.' })
+  arr.push(now)
+  photoHits.set(ip, arr)
+  next()
+}
+
+function requireUser(req, res, next) {
+  const u = sessionUser(req)
+  if (!u) return res.status(401).json({ error: 'login_required', message: '로그인이 필요해요.' })
+  req.user = u
+  next()
+}
+
+// 형식 판별(매직 바이트) + 메타데이터 검사. 반환: { mime, meta: boolean } 또는 null(지원하지 않는/깨진 파일)
+const PNG_SIG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+const PNG_META_CHUNKS = new Set(['tEXt', 'iTXt', 'zTXt', 'eXIf', 'tIME'])
+function inspectJpeg(buf) {
+  // 세그먼트를 따라가며 APP1(EXIF/XMP)·APP13(IPTC/Photoshop)을 찾는다. 프로그레시브(여러 SOS)도 따라간다.
+  let i = 2
+  while (i < buf.length) {
+    if (buf[i] !== 0xff) return null
+    while (buf[i + 1] === 0xff) i++ // 채움 바이트
+    const m = buf[i + 1]
+    if (m === undefined) return null
+    i += 2
+    if (m === 0xd9) {
+      // EOI 뒤에 붙은 꼬리 데이터(제조사 트레일러 등)는 메타데이터로 본다
+      const tail = buf.subarray(i)
+      return { mime: 'image/jpeg', meta: tail.some((b) => b !== 0x00 && b !== 0xff) }
+    }
+    if ((m >= 0xd0 && m <= 0xd7) || m === 0x01) continue // 길이 없는 마커
+    if (i + 2 > buf.length) return null
+    const len = buf.readUInt16BE(i)
+    if (len < 2 || i + len > buf.length) return null
+    if (m === 0xe1 || m === 0xed) return { mime: 'image/jpeg', meta: true }
+    i += len
+    if (m === 0xda) {
+      // 엔트로피 데이터를 건너뛰어 다음 마커(FF 뒤 00·RSTn 아님)를 찾는다
+      while (i < buf.length && !(buf[i] === 0xff && i + 1 < buf.length && buf[i + 1] !== 0x00 && !(buf[i + 1] >= 0xd0 && buf[i + 1] <= 0xd7))) i++
+      if (i >= buf.length) return null
+    }
+  }
+  return null
+}
+function inspectPng(buf) {
+  let i = 8
+  let first = true
+  while (i + 12 <= buf.length) {
+    const len = buf.readUInt32BE(i)
+    const type = buf.toString('latin1', i + 4, i + 8)
+    if (!/^[A-Za-z]{4}$/.test(type) || i + 12 + len > buf.length) return null
+    if (first && type !== 'IHDR') return null
+    first = false
+    if (PNG_META_CHUNKS.has(type)) return { mime: 'image/png', meta: true }
+    i += 12 + len
+    if (type === 'IEND') return { mime: 'image/png', meta: i < buf.length }
+  }
+  return null
+}
+function inspectImage(buf) {
+  if (buf.length >= 4 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return inspectJpeg(buf)
+  if (buf.length >= 8 && buf.subarray(0, 8).equals(PNG_SIG)) return inspectPng(buf)
+  return null
+}
+
+function cleanZone(v) {
+  if (typeof v !== 'string') return null
+  const s = v.trim()
+  return s && s.length <= PHOTO_ZONE_MAX ? s : null
+}
+const cleanPhase = (v) => (typeof v === 'string' && PHOTO_PHASES.has(v.trim()) ? v.trim() : null)
+
+app.post('/api/photos/consent', requireUser, (req, res) => {
+  const consentAt = new Date().toISOString()
+  updPhotoConsent.run(consentAt, req.user.id)
+  return res.json({ ok: true, consentAt })
+})
+
+app.post(
+  '/api/photos',
+  photoRateLimit,
+  requireUser,
+  express.raw({ type: ['image/jpeg', 'image/png'], limit: PHOTO_MAX_BYTES }),
+  (req, res) => {
+    const u = req.user
+    if (!selPhotoConsent.get(u.id)?.photo_consent_at) return res.status(403).json({ error: 'photo_consent_required', message: '사진 보관 동의가 필요해요.' })
+    const zone = cleanZone(req.query.zone)
+    const phase = cleanPhase(req.query.phase)
+    const memoRaw = req.query.memo === undefined ? '' : req.query.memo
+    if (!zone) return res.status(400).json({ error: 'bad_zone', message: '구역을 확인해 주세요.' })
+    if (!phase) return res.status(400).json({ error: 'bad_phase', message: '입주·퇴실 중 하나를 골라 주세요.' })
+    if (typeof memoRaw !== 'string' || memoRaw.length > PHOTO_MEMO_MAX) return res.status(400).json({ error: 'memo_too_long', message: `메모는 ${PHOTO_MEMO_MAX}자까지 쓸 수 있어요.` })
+    const buf = req.body
+    if (!Buffer.isBuffer(buf) || !buf.length) return res.status(415).json({ error: 'unsupported_type', message: 'JPEG 또는 PNG 사진만 올릴 수 있어요.' })
+    const info = inspectImage(buf)
+    if (!info) return res.status(415).json({ error: 'unsupported_type', message: 'JPEG 또는 PNG 사진만 올릴 수 있어요.' })
+    if (info.meta) return res.status(422).json({ error: 'metadata_present', message: '촬영 정보가 남아 있는 사진은 받지 않아요. 앱에서 가리기를 마친 사진을 올려 주세요.' })
+
+    const sha256 = crypto.createHash('sha256').update(buf).digest('hex')
+    const existing = selPhotoBySha.get(u.id, sha256)
+    if (existing) return res.status(200).json({ photo: publicPhoto(existing) })
+    if (cntPhotos.get(u.id).n >= PHOTO_LIMIT) return res.status(409).json({ error: 'limit_reached', message: `사진은 ${PHOTO_LIMIT}장까지 보관할 수 있어요.` })
+
+    const receivedAt = new Date().toISOString()
+    const sig = crypto.createHmac('sha256', RECEIPT_SECRET).update(`${sha256}|${receivedAt}`).digest('hex')
+    let id
+    try {
+      id = Number(insPhoto.run(u.id, sha256, info.mime, buf.length, zone, phase, memoRaw, receivedAt, sig).lastInsertRowid)
+    } catch {
+      const dup = selPhotoBySha.get(u.id, sha256)
+      if (dup) return res.status(200).json({ photo: publicPhoto(dup) })
+      return res.status(500).json({ error: 'save_failed', message: '사진을 저장하지 못했어요.' })
+    }
+    const row = selPhoto.get(id, u.id)
+    const file = photoFile(row)
+    try {
+      fs.mkdirSync(path.dirname(file), { recursive: true })
+      const tmp = `${file}.tmp-${process.pid}`
+      fs.writeFileSync(tmp, buf, { mode: 0o600 })
+      fs.renameSync(tmp, file)
+    } catch (e) {
+      delPhoto.run(id, u.id)
+      console.log(`[photos] write fail err=${String(e?.code || e?.name || '')}`)
+      return res.status(500).json({ error: 'save_failed', message: '사진을 저장하지 못했어요.' })
+    }
+    insReceipt.run(sha256, receivedAt, sig)
+    track('receipt')
+    return res.status(201).json({ photo: publicPhoto(row) })
+  },
+)
+
+app.get('/api/photos', requireUser, (req, res) => {
+  const consentAt = selPhotoConsent.get(req.user.id)?.photo_consent_at || null
+  return res.json({ photos: selPhotos.all(req.user.id).map(publicPhoto), consentAt })
+})
+
+const parseId = (s) => (/^\d{1,15}$/.test(String(s)) ? Number(s) : null)
+
+app.get('/api/photos/:id/file', requireUser, (req, res) => {
+  const id = parseId(req.params.id)
+  const p = id === null ? null : selPhoto.get(id, req.user.id)
+  if (!p) return res.status(404).json({ error: 'not_found' })
+  const file = photoFile(p)
+  let stat
+  try {
+    stat = fs.statSync(file)
+  } catch {
+    return res.status(404).json({ error: 'not_found' })
+  }
+  res.set({
+    'Content-Type': p.mime,
+    'Content-Length': String(stat.size),
+    'Cache-Control': 'private, no-store',
+    'X-Content-Type-Options': 'nosniff',
+    'Content-Disposition': 'inline',
+  })
+  const stream = fs.createReadStream(file)
+  stream.on('error', () => res.destroy())
+  stream.pipe(res)
+})
+
+app.patch('/api/photos/:id', requireUser, (req, res) => {
+  const id = parseId(req.params.id)
+  const p = id === null ? null : selPhoto.get(id, req.user.id)
+  if (!p) return res.status(404).json({ error: 'not_found' })
+  const body = req.body || {}
+  let { memo, zone, phase } = p
+  if (body.memo !== undefined) {
+    if (typeof body.memo !== 'string' || body.memo.length > PHOTO_MEMO_MAX) return res.status(400).json({ error: 'memo_too_long', message: `메모는 ${PHOTO_MEMO_MAX}자까지 쓸 수 있어요.` })
+    memo = body.memo
+  }
+  if (body.zone !== undefined) {
+    zone = cleanZone(body.zone)
+    if (!zone) return res.status(400).json({ error: 'bad_zone', message: '구역을 확인해 주세요.' })
+  }
+  if (body.phase !== undefined) {
+    phase = cleanPhase(body.phase)
+    if (!phase) return res.status(400).json({ error: 'bad_phase', message: '입주·퇴실 중 하나를 골라 주세요.' })
+  }
+  updPhoto.run(memo, zone, phase, p.id, req.user.id)
+  return res.json({ photo: publicPhoto(selPhoto.get(p.id, req.user.id)) })
+})
+
+app.delete('/api/photos/:id', requireUser, (req, res) => {
+  const id = parseId(req.params.id)
+  const p = id === null ? null : selPhoto.get(id, req.user.id)
+  if (!p) return res.status(404).json({ error: 'not_found' })
+  fs.rmSync(photoFile(p), { force: true })
+  delPhoto.run(p.id, req.user.id)
   return res.json({ ok: true })
 })
 

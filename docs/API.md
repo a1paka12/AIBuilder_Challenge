@@ -8,13 +8,13 @@
 | 항목 | 내용 |
 |---|---|
 | 기본 주소 | `https://bojeung.193-123-163-215.sslip.io` (로컬: `http://localhost:8420`) |
-| 형식 | 요청·응답 본문 JSON(`Content-Type: application/json`), 요청 본문 최대 **32KB** |
-| 인증 | 기본 기능은 로그인 없이 쓴다. 회원가입(FR-10, 선택)을 하면 HttpOnly 세션 쿠키 `bj_session`으로 로그인 상태를 유지하며, 이 쿠키가 필요한 곳은 `GET`·`DELETE /api/me`·`POST /api/auth/logout`뿐이다(10장) |
-| 속도 제한 | 모든 `POST` 엔드포인트에 **IP당 분당 30회**(1분 이동 창), `/api/auth/*`는 **IP당 분당 10회**. IP는 서버 메모리에만 두고 DB·로그에 쓰지 않는다. 프록시(Caddy) 뒤라 `trust proxy 1` |
+| 형식 | 요청·응답 본문 JSON(`Content-Type: application/json`), 요청 본문 최대 **32KB**. 예외: `POST /api/photos`만 본문이 이미지 바이트(`image/jpeg`·`image/png`)이고 최대 **6MB** |
+| 인증 | 기본 기능은 로그인 없이 쓴다. 회원가입(FR-10, 선택)을 하면 HttpOnly 세션 쿠키 `bj_session`으로 로그인 상태를 유지하며, 이 쿠키가 필요한 곳은 `GET`·`DELETE /api/me`·`POST /api/auth/logout`과 사진 보관 `/api/photos*`(11장, 없으면 `401 login_required`)뿐이다(10장) |
+| 속도 제한 | 모든 `POST` 엔드포인트에 **IP당 분당 30회**(1분 이동 창), `/api/auth/*`는 **IP당 분당 10회**, 사진 업로드 `POST /api/photos`는 **IP당 분당 20회**(로그인 확인보다 먼저 센다). IP는 서버 메모리에만 두고 DB·로그에 쓰지 않는다. 프록시(Caddy) 뒤라 `trust proxy 1` |
 | 오류 형식 | `{ "error": "<코드>", "message": "<한국어 안내>" }` (예외: 지문 조회 404는 `{ "found": false }`, metric 400은 `{ "error": "bad_event" }`) |
 | 공통 오류 | `400 bad_request` JSON 형식 오류 · `413 too_large` 본문 32KB 초과 · `429 rate_limited` 속도 제한 초과 |
 
-**사진 업로드 API는 없다.** 사진(원본·처리본)은 브라우저 밖으로 나가지 않고, 서버는 지문(SHA-256)만 받는다.
+**원본 사진은 받지 않는다.** 로그인하지 않으면 서버는 가린 처리본의 지문(SHA-256)만 받는다(`/api/receipt`). 로그인한 회원이 사진 저장에 동의하고 [확인하고 저장하기]를 누르면 **가린 처리본만** 받아 그 회원 계정에 보관한다(`/api/photos`, 11장). 메타데이터가 남은 파일은 거절하고, 공개 링크는 없다.
 
 | 메서드 | 경로 | 하는 일 | 속도 제한 |
 |---|---|---|---|
@@ -32,7 +32,13 @@
 | `POST` | `/api/auth/google` | 구글 간편 가입·로그인 (FR-10) | 예(분당 10회) |
 | `POST` | `/api/auth/logout` | 로그아웃 (FR-10) | 예(분당 10회) |
 | `GET` | `/api/me` | 현재 로그인 사용자 (FR-10) | 아니요 |
-| `DELETE` | `/api/me` | 회원 탈퇴(즉시 삭제) (FR-10) | 아니요 |
+| `DELETE` | `/api/me` | 회원 탈퇴(즉시 삭제, 저장한 사진 포함) (FR-10) | 아니요 |
+| `POST` | `/api/photos/consent` | 사진 저장 동의 기록 (FR-10, 로그인) | 아니요 |
+| `POST` | `/api/photos` | 가린 사진 처리본 저장 (FR-10, 로그인·동의) | 예(분당 20회) |
+| `GET` | `/api/photos` | 내가 저장한 사진 목록 (FR-10, 로그인) | 아니요 |
+| `GET` | `/api/photos/:id/file` | 내 사진 파일 (FR-10, 로그인·본인만) | 아니요 |
+| `PATCH` | `/api/photos/:id` | 메모·구역·입주/퇴실 고치기 (FR-10, 로그인) | 아니요 |
+| `DELETE` | `/api/photos/:id` | 사진 한 장 삭제(파일·행) (FR-10, 로그인) | 아니요 |
 | `GET` | `/*` (`/api/` 제외) | 빌드된 화면 `dist/index.html` (해시 라우팅) | 아니요 |
 
 공통 `429` 응답:
@@ -390,6 +396,8 @@ AI는 옮겨 적기만 한다. 공제가 맞는지·특약이 유효한지·얼�
 | `RECEIPT_SECRET` | 시작 시 임의 값 | 지문 기록 HMAC 서명 키 |
 | `GOOGLE_CLIENT_ID` | (없음) | 구글 OAuth 웹 클라이언트 ID(공개값). 없으면 `/api/config`가 `null`을 주고 화면은 "구글 간편 가입 준비 중"을 보이며, `/api/auth/google`은 `503 google_not_configured` |
 | `SESSION_SECRET` | `RECEIPT_SECRET` 값 | 세션 쿠키 HMAC 서명 키. 바꾸면 기존 로그인이 모두 풀린다 |
+| `DATA_DIR` | `server/data` | SQLite DB(`bojeung.db`)와 사진 폴더(`photos/<user_id>/`) 위치. `server/data/photos/`는 `.gitignore` |
+| `PHOTO_PURGE_AT` | `2026-12-31T15:00:00Z`(2026-12-31 24:00 KST) | 이 시각이 지나면 서버가 시작 시·1시간마다 `photos`와 사진 폴더를 전부 삭제 |
 
 `.env`는 저장소에 없고 `.env.example`만 있다. 실행: `npm install` → `npm run build` → `npm start` (개발: `npm run dev`).
 
@@ -400,7 +408,7 @@ AI는 옮겨 적기만 한다. 공제가 맞는지·특약이 유효한지·얼�
 | 데이터 | 이유 |
 |---|---|
 | 공제 문자 원문·치환 대응표 | 브라우저에서 가린 처리본만 전송 |
-| 사진 파일·원본 파일명·EXIF·GPS | 사진 업로드 API 없음, 지문만 전송 |
+| 사진 원본·원본 파일명·EXIF·GPS | 원본은 보내지 않음. 로그인하지 않으면 지문만, 로그인 후 저장하면 메타데이터를 지운 가린 처리본만 전송(서버가 메타데이터 재검사) |
 | 변호사 찾아보기 조건·결과 | 브라우저 안에서 계산, `lawyer_search` 횟수만 전송 |
 | 문자·내용증명 입력값(이름·주소 등) | 브라우저 안에서 서식 채우기에만 사용 |
 | (FR-10) 구글 계정 이름·프로필 사진 | 서버가 토큰 검증 중 볼 수는 있으나 저장하지 않음. 이메일·`sub`만 저장 |
@@ -500,4 +508,105 @@ AI는 옮겨 적기만 한다. 공제가 맞는지·특약이 유효한지·얼�
 
 ### 10-7. `DELETE /api/me` — 회원 탈퇴
 
-쿠키의 사용자 행을 `users`에서 바로 삭제하고 쿠키를 지운다 → `{ "ok": true }`. 화면은 확인 단계를 거친 뒤에만 호출한다. 설문·의향은 원래 계정과 연결되지 않으므로 이 호출로 바뀌지 않는다(기기 ID 기준 삭제는 처리방침의 문의 절차).
+쿠키 사용자의 `photos` 행과 사진 폴더(`<DATA_DIR>/photos/<user_id>/`)를 지우고, `users` 행을 바로 삭제한 뒤 쿠키를 지운다 → `{ "ok": true }`. 화면은 확인 단계를 거친 뒤에만 호출한다. 설문·의향은 원래 계정과 연결되지 않으므로 이 호출로 바뀌지 않는다(기기 ID 기준 삭제는 처리방침의 문의 절차).
+
+---
+
+## 11. 사진 보관 (FR-10, 로그인 회원 선택)
+
+로그인한 회원이 방 상태 기록에서 [확인하고 저장하기]를 누르면, 브라우저에서 가리기·메타데이터 제거를 마친 **처리본만** 서버에 보관한다. 원본(가리기 전 사진)은 받지 않는다. 로그인하지 않으면 이 API를 쓰지 않고 2장 `/api/receipt`로 지문만 보낸다.
+
+**공통**
+
+- 모든 경로에 로그인(세션 쿠키) 필요. 없으면 `401 { "error": "login_required", "message": "로그인이 필요해요." }`.
+- 응답의 `photo` 객체:
+
+```json
+{
+  "id": 7,
+  "sha256": "3a7bd3e2360a3d29eea436fcfb7e44c735d117c42d1c1835420b6b9942dd4f1b",
+  "mime": "image/jpeg",
+  "zone": "벽",
+  "phase": "입주",
+  "memo": "창문 옆 얼룩",
+  "receivedAt": "2026-10-03T06:12:00.000Z",
+  "sig": "9f2c…(HMAC-SHA256 16진수 64자)",
+  "url": "/api/photos/7/file"
+}
+```
+
+- `url`은 로그인한 본인만 열 수 있는 주소이고 공개 링크가 아니다. 남의 사진·없는 사진은 모두 `404 { "error": "not_found" }`(있는지 여부를 드러내지 않음).
+- 보유: 한 장 삭제·탈퇴 시 즉시 삭제, 늦어도 2026-12-31 24:00 KST에 서버가 자동으로 전부 삭제(`PHOTO_PURGE_AT`).
+
+### 11-1. `POST /api/photos/consent` — 사진 저장 동의
+
+본문 없음. `users.photo_consent_at`에 현재 시각을 기록한다.
+
+```json
+{ "ok": true, "consentAt": "2026-10-03T06:11:30.000Z" }
+```
+
+화면은 처음 저장할 때 항목(가린 처리본·구역·입주/퇴실·메모·기록 시각)·목적·보유기간을 보여 주고 동의를 받은 뒤에만 부른다.
+
+### 11-2. `POST /api/photos?zone=<구역>&phase=<입주|퇴실>&memo=<선택>` — 처리본 저장
+
+- 본문: 처리본 이미지 **바이트 그대로**. `Content-Type: image/jpeg` 또는 `image/png`. 이 경로만 `express.raw`로 최대 6MB.
+- 구역·입주/퇴실·메모는 쿼리 문자열(URL 인코딩). 파일 이름은 보내지 않는다.
+
+서버 처리 순서:
+
+1. IP당 분당 20회 확인(`429 rate_limited`) → 로그인 확인(`401`).
+2. 동의가 없으면 `403 photo_consent_required`.
+3. `zone` 1~40자(`400 bad_zone`), `phase`는 `입주`·`퇴실`(`400 bad_phase`), `memo` 300자 이내(`400 memo_too_long`).
+4. **매직 바이트**로 형식 판별 — JPEG(`FF D8 FF`)·PNG 시그니처가 아니거나 구조가 깨졌으면 `415 unsupported_type`.
+5. 메타데이터 검사 — JPEG의 APP1(EXIF/XMP)·APP13(IPTC/Photoshop) 세그먼트나 EOI 뒤 꼬리 데이터, PNG의 `tEXt`·`iTXt`·`zTXt`·`eXIf`·`tIME` 청크나 IEND 뒤 데이터가 있으면 `422 metadata_present`.
+6. 서버가 SHA-256을 직접 계산. 같은 회원에게 같은 지문이 이미 있으면 **기존 것을 `200`으로** 돌려준다.
+7. 회원당 30장이 차 있으면 `409 limit_reached`.
+8. `received_at`(서버 시각)과 `sig = HMAC-SHA256(RECEIPT_SECRET, "<sha256>|<received_at>")`(2장 receipt와 같은 방식)을 만들고 `photos` 행 추가 → 파일을 `<DATA_DIR>/photos/<user_id>/<id>.jpg|png`에 저장(임시 파일 후 이름 바꾸기, 권한 0600). 파일 쓰기에 실패하면 행을 지우고 `500 save_failed`.
+9. `receipts`에도 `(sha256, received_at, sig)`를 한 줄 기록(계정 번호 없음).
+
+| 상태 | 본문 | 언제 |
+|---|---|---|
+| `201` | `{ "photo": {…} }` | 새로 저장 |
+| `200` | `{ "photo": {…} }` | 같은 처리본이 이미 저장돼 있음(새로 만들지 않음) |
+| `400` | `bad_zone` · `bad_phase` · `memo_too_long` | 입력값 오류 |
+| `401` | `login_required` | 로그인 안 함 |
+| `403` | `photo_consent_required` | 사진 저장 동의 전 |
+| `409` | `limit_reached` | 30장 초과 |
+| `413` | `too_large` | 6MB 초과 |
+| `415` | `unsupported_type` | JPEG·PNG가 아님(매직 바이트 기준) 또는 빈 본문 |
+| `422` | `metadata_present` | 메타데이터가 남아 있음 — 화면에서 가리기를 다시 거친 처리본만 받음 |
+| `429` | `rate_limited` | IP당 분당 20회 초과 |
+
+### 11-3. `GET /api/photos` — 내 사진 목록
+
+```json
+{ "photos": [ { …photo }, … ], "consentAt": "2026-10-03T06:11:30.000Z" }
+```
+
+본인 것만, `received_at` 순. 동의 전이면 `consentAt: null`.
+
+### 11-4. `GET /api/photos/:id/file` — 내 사진 파일
+
+본인 사진이면 파일을 스트림으로 보낸다.
+
+| 헤더 | 값 |
+|---|---|
+| `Content-Type` | 저장할 때 판별한 `image/jpeg` 또는 `image/png` |
+| `Cache-Control` | `private, no-store` |
+| `X-Content-Type-Options` | `nosniff` |
+| `Content-Disposition` | `inline` |
+
+남의 사진·없는 id·파일 없음은 `404 { "error": "not_found" }`.
+
+### 11-5. `PATCH /api/photos/:id` — 메모·구역·입주/퇴실 고치기
+
+```json
+{ "memo": "창문 옆 얼룩(입주 전부터)", "zone": "창문/문", "phase": "입주" }
+```
+
+세 칸 모두 선택. 검증은 11-2의 3번과 같다(`400 bad_zone`·`bad_phase`·`memo_too_long`). 성공하면 `{ "photo": {…} }`, 남의 것·없음은 `404`. 사진 바이트·지문·수신 시각은 바꿀 수 없다.
+
+### 11-6. `DELETE /api/photos/:id` — 한 장 삭제
+
+파일과 `photos` 행을 함께 지운다 → `{ "ok": true }`. 남의 것·없음은 `404`. `receipts`의 지문 기록은 사진을 되살릴 수 없는 64자 값이라 그대로 남고, 2026-12-31 일괄 삭제·요청 시 삭제를 따른다.

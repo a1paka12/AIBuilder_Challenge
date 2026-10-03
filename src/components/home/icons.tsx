@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
  * 첫 화면 선 아이콘 (24px, stroke). 장식이라 aria-hidden.
  * 정부 상징·기관 로고·인증 도장·방패·리본 모양은 쓰지 않는다.
  */
-export type TaskIconName = 'message' | 'camera' | 'letter' | 'building' | 'gift' | 'receipt' | 'lock' | 'check' | 'person'
+export type TaskIconName = 'message' | 'camera' | 'letter' | 'building' | 'gift' | 'receipt' | 'lock' | 'check' | 'person' | 'headset'
 
 const PATHS: Record<TaskIconName, ReactNode> = {
   /* 말풍선 + 줄 (공제 문자 정리) */
@@ -67,6 +67,15 @@ const PATHS: Record<TaskIconName, ReactNode> = {
       <path d="M3.5 19.5c.6-3.4 2.8-5.3 5.5-5.3 1.2 0 2.3.4 3.2 1" />
       <circle cx="16.5" cy="15.5" r="3" />
       <path d="M18.7 17.7l2.3 2.3" />
+    </>
+  ),
+  /* 헤드셋 (고객센터) */
+  headset: (
+    <>
+      <path d="M4.5 14v-2a7.5 7.5 0 0 1 15 0v2" />
+      <rect x="3.5" y="13.5" width="4" height="6" rx="1.5" />
+      <rect x="16.5" y="13.5" width="4" height="6" rx="1.5" />
+      <path d="M18.5 19.5c0 1.3-1.5 2-3.5 2h-2" />
     </>
   ),
   /* 체크 (사실 목록) */
