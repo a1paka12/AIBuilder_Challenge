@@ -139,11 +139,11 @@ const IconUser = () => (
 
 /* ── 상단: 고지 띠 + 헤더(로고·계정) + 업무 바로가기 아이콘 줄 ─────────────────────────────────────────── */
 
-/** 헤더 오른쪽 계정 버튼 — 로그인 전 "로그인·회원가입", 로그인 후 "내 계정" (둘 다 #/signup) */
+/** 헤더 오른쪽 계정 버튼 — 로그인 전 "로그인·회원가입", 로그인 후 "내 계정" (둘 다 #/signup, view=account 면 가입 완료 화면에서도 내 계정으로 전환) */
 function AccountLink({ active }: { active: boolean }) {
   const { status, user } = useMe()
   return (
-    <a className="account-link" href={hrefOf('signup')} aria-current={active ? 'page' : undefined} data-loading={status === 'loading' || undefined}>
+    <a className="account-link" href={`${hrefOf('signup')}?view=account`} aria-current={active ? 'page' : undefined} data-loading={status === 'loading' || undefined}>
       <IconUser />
       <span>{user ? '내 계정' : '로그인·회원가입'}</span>
     </a>

@@ -26,7 +26,7 @@ const NOTES = [
 
 const OTHER_TASKS: { route: 'deduct' | 'record' | 'help'; title: string; desc: string }[] = [
   { route: 'deduct', title: '공제 메시지 정리', desc: '집주인 문자를 붙여 넣으면 항목·금액·원문을 표로' },
-  { route: 'record', title: '방 상태 기록', desc: '사진은 내 기기에, 서버에는 파일 지문만' },
+  { route: 'record', title: '방 상태 기록', desc: '원본은 안 보내요 · 로그인 저장 시 가린 처리본만 보관, 아니면 지문만' },
   { route: 'help', title: '상담 기관 안내', desc: '무료 법률상담 기관 · 대한변협 공식 변호사 검색' },
 ]
 

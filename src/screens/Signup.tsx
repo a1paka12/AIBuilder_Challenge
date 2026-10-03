@@ -635,7 +635,7 @@ function AccountPanel({ user, onLoggedOut, onDeleted }: { user: User; onLoggedOu
           <h3 id={`${uid}-confirm`} ref={confirmTitle} tabIndex={-1} className="su-confirm-title">
             정말 탈퇴할까요?
           </h3>
-          <span>탈퇴하면 계정 정보(이메일·로그인 정보)를 바로 삭제하고 되돌릴 수 없어요. 같은 이메일로 다시 가입할 수는 있어요.</span>
+          <span>탈퇴하면 계정 정보(이메일·로그인 정보)와 저장한 사진도 함께 바로 삭제하고 되돌릴 수 없어요. 같은 이메일로 다시 가입할 수는 있어요.</span>
           <div className="su-actions">
             <button type="button" className="btn su-danger" onClick={() => void doDelete()} disabled={busy} aria-busy={busy}>
               탈퇴하기
@@ -712,6 +712,19 @@ export default function Signup() {
     }
   }, [])
 
+  // 헤더 [내 계정](#/signup?view=account) — 가입 완료·설문 화면에서 눌러도 내 계정 보기로 전환하고, 다음 클릭도 hashchange 가 나도록 쿼리를 지운다
+  useEffect(() => {
+    const check = () => {
+      const qs = window.location.hash.split('?')[1] ?? ''
+      if (new URLSearchParams(qs).get('view') !== 'account') return
+      setFlow((f) => (f === 'survey' || f === 'done' ? 'join' : f))
+      history.replaceState(null, '', `${window.location.pathname}${window.location.search}${hrefOf('signup')}`)
+    }
+    check()
+    window.addEventListener('hashchange', check)
+    return () => window.removeEventListener('hashchange', check)
+  }, [])
+
   const view: View = status === 'loading'
       ? 'loading'
       : flow === 'survey' || flow === 'done'
@@ -782,7 +795,7 @@ export default function Signup() {
               setFlow('join')
             }}
             onDeleted={() => {
-              setNotice('탈퇴했어요. 계정 정보를 바로 삭제했어요.')
+              setNotice('탈퇴했어요. 계정 정보와 저장한 사진도 함께 바로 삭제했어요.')
               setTab('signup')
               setFlow('join')
               setConsentShown(false)

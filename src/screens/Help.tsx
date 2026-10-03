@@ -286,7 +286,7 @@ export default function Help() {
           <li>
             <button type="button" className="btn" onClick={() => go('record')}>
               <span>방 상태 기록</span>
-              <small>사진은 내 기기에, 지문만 기록</small>
+              <small>원본은 안 보내요 · 로그인 저장 시 가린 처리본만, 아니면 지문만</small>
             </button>
           </li>
           <li>
