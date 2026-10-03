@@ -3,7 +3,6 @@ import EventBand from '../components/home/EventBand'
 import { TaskIcon } from '../components/home/icons'
 import { go } from '../router'
 import TrustBadges from '../components/TrustBadges'
-import ServiceMarks from '../components/ServiceMarks'
 import '../styles/home.css'
 
 /*
@@ -77,8 +76,6 @@ export default function Home() {
           <HeroPreview />
         </div>
       </section>
-
-      <ServiceMarks variant="light" />
 
       {/* 2) 이렇게 진행돼요 — 진행 4단계 (업무 바로가기는 헤더 아래 아이콘 줄로 옮김) */}
       <section className="home-steps-sec" aria-labelledby="home-steps-title">

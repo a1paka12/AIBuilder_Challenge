@@ -129,14 +129,6 @@ const IconExternal = ({ className }: { className?: string }) => (
   </LineIcon>
 )
 
-/* 말풍선 (온라인 문의) */
-const IconChat = () => (
-  <LineIcon size={18}>
-    <path d="M4 5h16v11h-9l-4.5 3.5V16H4z" />
-    <path d="M8 9.5h8M8 12.5h5" />
-  </LineIcon>
-)
-
 /* 사람 (계정) */
 const IconUser = () => (
   <LineIcon size={16}>
@@ -271,7 +263,7 @@ function Header() {
   )
 }
 
-/* ── 바닥글: 링크 줄 · 고객센터 · 사업자 정보 · 고지 · 서비스 메뉴 + 준수 표시 · 저작권 ───────── */
+/* ── 바닥글: 사업자 정보 · 서비스 원칙 마크 + 준수·점검 표시 ───────── */
 
 /* 사업자 정보 — src/data/company.ts 의 값을 그대로 보여 준다(지어낸 번호 없음) */
 const BIZ_ROWS: { label: string; value: string; note?: string }[] = [
@@ -284,70 +276,11 @@ const BIZ_ROWS: { label: string; value: string; note?: string }[] = [
   { label: '개인정보 보호 담당', value: COMPANY.privacyOfficer },
 ]
 
-/* 서비스 메뉴 — 예전 상단 글자 메뉴. 가격 안내는 바닥글에 두지 않는다(헤더 아이콘 줄·첫 화면에서 연결) */
-const FOOTER_MENU: { route: Route; label: string }[] = [
-  { route: 'deduct', label: '공제 정리' },
-  { route: 'record', label: '방 상태 기록' },
-  { route: 'lawyer', label: '변호사 찾아보기' },
-  { route: 'help', label: '상담 기관' },
-  { route: 'cert', label: '내용증명' },
-]
-
 function Footer() {
   const { route } = useRoute()
-  const current = (r: Route) => (route === r ? 'page' : undefined)
   return (
     <footer className="footer">
       <div className="container">
-        <nav className="footer-links" aria-label="바닥글 메뉴">
-          <ul>
-            <li>
-              <a className="footer-privacy" href={hrefOf('privacy')} aria-current={current('privacy')}>
-                개인정보 처리방침
-              </a>
-            </li>
-            <li>
-              <a href={hrefOf('event')} aria-current={current('event')}>
-                이벤트
-              </a>
-            </li>
-            <li>
-              <a href={COMPANY.repoUrl} target="_blank" rel="noopener noreferrer">
-                GitHub 저장소<span className="shell-sr"> (새 창)</span>
-                <IconExternal className="footer-ext" />
-              </a>
-            </li>
-          </ul>
-        </nav>
-
-        <div className="footer-grid">
-          <div className="footer-about">
-            <p className="footer-brand">
-              <HouseMark size={22} />
-              보증금 지킴이
-            </p>
-            <p className="footer-desc">퇴실 공제 통보를 받은 자취생을 위한 공제 내역 정리·근거 문의·방 상태 기록 서비스</p>
-          </div>
-
-          <section className="footer-cs" aria-labelledby="footer-cs-title">
-            <h2 id="footer-cs-title" className="footer-cs-title">
-              고객센터
-            </h2>
-            <a className="footer-cs-link" href={COMPANY.contactUrl} target="_blank" rel="noopener noreferrer">
-              <IconChat />
-              <span>
-                {COMPANY.contactLabel}
-                <span className="shell-sr"> (새 창)</span>
-              </span>
-              <IconExternal className="footer-ext" />
-            </a>
-            <p className="footer-cs-note">{COMPANY.contactNote}</p>
-            <a className="footer-cs-more" href={hrefOf('support')} aria-current={current('support')}>
-              고객센터 바로가기
-            </a>
-          </section>
-        </div>
-
         <section className="footer-biz-sec" aria-labelledby="footer-biz-title">
           <h2 id="footer-biz-title" className="footer-biz-title">
             사업자 정보
@@ -362,36 +295,36 @@ function Footer() {
                 </dd>
               </div>
             ))}
+            <div>
+              <dt>고객센터</dt>
+              <dd>
+                <a className="footer-biz-link" href={COMPANY.contactUrl} target="_blank" rel="noopener noreferrer">
+                  {COMPANY.contactLabel}
+                  <span className="shell-sr"> (새 창)</span>
+                  <IconExternal className="footer-ext" />
+                </a>
+                <span className="footer-biz-note">{COMPANY.contactNote}</span>
+              </dd>
+            </div>
+            <div>
+              <dt>개인정보 처리방침</dt>
+              <dd>
+                <a
+                  className="footer-biz-link footer-privacy"
+                  href={hrefOf('privacy')}
+                  aria-current={route === 'privacy' ? 'page' : undefined}
+                >
+                  개인정보 처리방침 보기
+                </a>
+              </dd>
+            </div>
           </dl>
         </section>
 
-        <div className="footer-legal">
-          <p>보증금 지킴이는 공개 자료를 찾아 보여 주는 정보 제공 도구이며, 법률 판단이나 대리를 하지 않아요.</p>
-          <p>
-            보증금 지킴이는 민간 학생 팀의 서비스이며 정부·공공기관 서비스가 아니고, 정보보호 관련 인증을 받지 않았어요. AI는 공제 내역을 정리만
-            하고 법률 판단은 하지 않아요.
-          </p>
-        </div>
-
-        <ServiceMarks variant="dark" />
         <div className="footer-comply-area">
-          <nav className="footer-svc" aria-labelledby="footer-svc-title">
-            <h2 id="footer-svc-title" className="footer-svc-title">
-              서비스 메뉴
-            </h2>
-            <ul>
-              {FOOTER_MENU.map((m) => (
-                <li key={m.route}>
-                  <a href={hrefOf(m.route)} aria-current={current(m.route)}>
-                    {m.label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </nav>
+          <ServiceMarks variant="dark" />
           <FooterCompliance />
         </div>
-        <p className="footer-copy">© 2026 보증금 지킴이 팀 · KOOKMIN AI BUILDER CHALLENGE 2026 출품작</p>
       </div>
     </footer>
   )

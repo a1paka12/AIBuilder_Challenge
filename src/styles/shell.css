@@ -227,110 +227,6 @@
   color: var(--ft-icon);
 }
 
-/* 링크 줄: 개인정보 처리방침(강조) · 이벤트 · GitHub 저장소 */
-.footer-links {
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--ft-line);
-}
-.footer-links ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0 4px;
-}
-.footer-links li {
-  display: inline-flex;
-  align-items: center;
-  min-width: 0;
-}
-.footer-links li + li::before {
-  content: '';
-  display: inline-block;
-  width: 1px;
-  height: 12px;
-  margin: 0 10px 0 6px;
-  background: var(--ft-line);
-}
-.footer-links a {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-height: 44px;
-  padding: 0 2px;
-  color: var(--ft-text);
-  font-size: 14px;
-  font-weight: 500;
-  text-decoration: none;
-}
-.footer-links a:hover,
-.footer-links a[aria-current='page'] {
-  color: #fff;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-.footer-links .footer-privacy {
-  color: var(--ft-link);
-  font-size: 15px;
-  font-weight: 700;
-}
-.footer-links .footer-privacy:hover {
-  color: #fff;
-}
-
-/* 소개 + 고객센터 */
-.footer-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
-  gap: 20px 32px;
-  padding: 20px 0;
-  border-bottom: 1px solid var(--ft-line);
-}
-.footer-about {
-  min-width: 0;
-}
-.footer .footer-desc {
-  margin: 0;
-  color: var(--ft-text);
-}
-.footer-cs {
-  min-width: 0;
-}
-.footer .footer-cs-title {
-  margin: 0 0 4px;
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 1.4;
-  color: var(--ft-strong);
-}
-.footer-cs-link {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  min-height: 44px;
-  margin: -4px 0;
-  color: #fff;
-  font-size: 18px;
-  font-weight: 700;
-  line-height: 1.3;
-  letter-spacing: -0.02em;
-  text-decoration: none;
-}
-.footer-cs-link:hover {
-  color: #fff;
-  text-decoration: underline;
-  text-underline-offset: 4px;
-}
-.footer .footer-cs-note {
-  margin: 6px 0 0;
-  font-size: 13px;
-  line-height: 1.6;
-  color: var(--ft-sub);
-}
-
 /* 사업자 정보 — 작은 글씨 정의 목록(값은 company.ts 그대로) */
 .footer-biz-sec {
   padding: 16px 0 0;
@@ -372,109 +268,44 @@
   color: var(--ft-sub);
 }
 
-/* 고지 */
-.footer-legal {
-  padding-top: 14px;
-  font-size: 13px;
-  line-height: 1.7;
+/* 고객센터·처리방침 링크 — 사업자 정보 안의 한 줄 */
+.footer-biz .footer-biz-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   color: var(--ft-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
-.footer .footer-legal p {
-  margin: 0 0 4px;
+.footer-biz .footer-biz-link:hover {
+  color: #fff;
+}
+.footer-biz .footer-privacy {
+  color: var(--ft-link);
+  font-weight: 700;
+}
+.footer-biz .footer-privacy:hover,
+.footer-biz .footer-privacy[aria-current='page'] {
+  color: #fff;
 }
 
-/* 서비스 메뉴 + 준수·점검 표시 — 같은 영역(서비스 메뉴가 위, 준수 표시가 아래) */
+/* 서비스 원칙 마크 + 준수·점검 표시 — 같은 영역(마크 줄이 첫 줄) */
 .footer-comply-area {
   margin-top: 16px;
   padding-top: 14px;
   border-top: 1px solid var(--ft-line);
 }
-.footer-svc {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0 16px;
-}
-.footer .footer-svc-title {
+.footer-comply-area .smarks {
   margin: 0;
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 1.4;
-  color: var(--ft-strong);
-}
-.footer-svc ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0 4px;
-}
-.footer-svc li {
-  display: inline-flex;
-  align-items: center;
-}
-.footer-svc li + li::before {
-  content: '';
-  display: inline-block;
-  width: 1px;
-  height: 12px;
-  margin: 0 10px 0 6px;
-  background: var(--ft-line);
-}
-.footer-svc a {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  padding: 0 2px;
-  color: var(--ft-text);
-  font-size: 14px;
-  font-weight: 500;
-  text-decoration: none;
-}
-.footer-svc a:hover,
-.footer-svc a[aria-current='page'] {
-  color: #fff;
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  justify-content: flex-start;
 }
 .footer-comply-area .fc {
-  margin-top: 8px;
-}
-
-/* 저작권 (index.css 의 margin-top 10px 유지) */
-.footer .footer-copy {
-  padding-top: 4px;
-  color: var(--ft-copy);
-  font-size: 12px;
+  margin-top: 12px;
 }
 
 @media (max-width: 640px) {
   .footer {
     padding: 20px 0 24px;
-  }
-  .footer-links li + li::before {
-    margin: 0 8px 0 4px;
-  }
-  /* 서비스 메뉴는 좁은 화면에서 두 줄로 접히므로 구분선 대신 간격만 둔다(줄 머리에 구분선이 남지 않게) */
-  .footer-svc {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  .footer-svc ul {
-    gap: 0 18px;
-  }
-  .footer-svc li + li::before {
-    content: none;
-  }
-  .footer-grid {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 16px;
-    padding: 16px 0;
-  }
-  .footer-cs-link {
-    font-size: 17px;
   }
   .footer-biz {
     grid-template-columns: minmax(0, 1fr);

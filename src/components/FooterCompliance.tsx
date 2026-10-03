@@ -141,7 +141,6 @@ export default function FooterCompliance() {
           </li>
         ))}
       </ul>
-      <p className="fc-font">글꼴: Pretendard (SIL Open Font License 1.1)</p>
     </section>
   )
 }

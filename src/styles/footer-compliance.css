@@ -117,12 +117,6 @@
   border-radius: var(--radius-sm, 4px);
 }
 
-.fc .fc-font {
-  margin: 12px 0 0;
-  font-size: 12px;
-  color: var(--fc-sub);
-}
-
 /* 중간 폭: 2칸 */
 @media (max-width: 960px) {
   .fc-list {
