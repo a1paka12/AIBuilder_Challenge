@@ -81,7 +81,7 @@ npm run build && npm start   # http://localhost:8420
 ```text
 src/
   screens/      화면 (Home, Deduct, Record, Lawyers, Help, Cert, Pricing, Event, Privacy, Signup)
-  components/   화면 부품 (공제 정리·첫 화면·기록 부품, 팝업, 설문, 바닥글 준수 표시)
+  components/   화면 부품 (공제 정리·첫 화면·기록 부품, 팝업, 설문, 바닥글 준수 표시, 서비스 원칙 마크)
   lib/          순수 로직 (mask.ts 텍스트 가림, imageMask.ts 사진 가림, lawyerMatch.ts 조건 일치 계산 등)
   data/         고정 데이터 (참고 자료, 가상 변호사 프로필, 무료 상담 기관, 운영 정보)
   styles/       화면별 CSS

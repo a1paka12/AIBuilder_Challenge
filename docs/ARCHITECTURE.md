@@ -296,13 +296,13 @@ AIBuilder_Challenge/
 │   ├── marks/              공공누리 제4유형·개인정보 처리 표시(라벨링) 아이콘
 │   └── slides/             발표자료 (/slides/)
 ├── src/
-│   ├── main.tsx · App.tsx  앱 시작, 상단 메뉴·바닥글·화면 전환
+│   ├── main.tsx · App.tsx  앱 시작, 업무 바로가기 줄·바닥글·화면 전환
 │   ├── router.ts           해시 라우팅, 화면 이름·문서 제목
 │   ├── state.tsx           화면 사이에서 공유하는 메모리 상태
 │   ├── api.ts              서버 호출(/api/*), 무작위 기기 ID
 │   ├── types.ts            공통 타입
 │   ├── screens/            화면 하나당 파일 하나 (Home, Deduct, Record, Lawyers, Help, Cert, Pricing, Event, Privacy)
-│   ├── components/         화면 부품 (deduct/, home/, record/, 팝업·설문·바닥글 준수 표시 등)
+│   ├── components/         화면 부품 (deduct/, home/, record/, 팝업·설문·바닥글 준수 표시·서비스 원칙 마크 등)
 │   ├── lib/                순수 로직: mask.ts(텍스트 가림), imageMask.ts(사진 가림·재인코딩), exif.ts(날짜 읽기),
 │   │                       lawyerMatch.ts(조건 일치 계산), promo.ts(팝업·혜택 표시)
 │   ├── data/               고정 데이터: references.ts(참고 자료 5종), lawyers.ts(가상 프로필), agencies.ts(무료 상담 기관), company.ts(운영 정보)

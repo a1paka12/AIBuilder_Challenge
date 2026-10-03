@@ -13,8 +13,11 @@ import Lawyers from './screens/Lawyers'
 import Signup from './screens/Signup'
 import PromoPopup from './components/PromoPopup'
 import FooterCompliance from './components/FooterCompliance'
+import ServiceMarks from './components/ServiceMarks'
 import { COMPANY } from './data/company'
 import { useMe } from './lib/auth'
+import { HOME_TASKS } from './components/home/tasks'
+import { TaskIcon } from './components/home/icons'
 import './styles/shell.css'
 import './styles/signup.css'
 
@@ -114,23 +117,6 @@ function LineIcon({ size = 16, className, children }: { size?: number; className
   )
 }
 
-/* 선물 상자 (출시 기념 이벤트) */
-const IconGift = () => (
-  <LineIcon size={16}>
-    <path d="M4 11h16v9H4z" />
-    <path d="M3 7h18v4H3z" />
-    <path d="M12 7v13" />
-    <path d="M12 7c-1.5-3-5-3-5-1s3 1 5 1zM12 7c1.5-3 5-3 5-1s-3 1-5 1z" />
-  </LineIcon>
-)
-
-/* 오른쪽 꺾쇠 */
-const IconChevron = ({ className }: { className?: string }) => (
-  <LineIcon size={14} className={className}>
-    <path d="M9 5l7 7-7 7" />
-  </LineIcon>
-)
-
 /* 새 창(외부 링크) */
 const IconExternal = ({ className }: { className?: string }) => (
   <LineIcon size={14} className={className}>
@@ -156,7 +142,7 @@ const IconUser = () => (
   </LineIcon>
 )
 
-/* ── 상단: 유틸리티 띠 + GNB ─────────────────────────────────────────── */
+/* ── 상단: 고지 띠 + 헤더(로고·계정) + 업무 바로가기 아이콘 줄 ─────────────────────────────────────────── */
 
 /** 헤더 오른쪽 계정 버튼 — 로그인 전 "로그인·회원가입", 로그인 후 "내 계정" (둘 다 #/signup) */
 function AccountLink({ active }: { active: boolean }) {
@@ -169,16 +155,22 @@ function AccountLink({ active }: { active: boolean }) {
   )
 }
 
-const MENU: { route: Route; label: string }[] = [
-  { route: 'deduct', label: '공제 정리' },
-  { route: 'record', label: '방 상태 기록' },
-  { route: 'lawyer', label: '변호사 찾아보기' },
-  { route: 'help', label: '상담 기관' },
-  { route: 'cert', label: '내용증명' },
-  { route: 'pricing', label: '가격 안내' },
+/*
+ * 업무 바로가기 — 헤더 바로 아래 아이콘 줄. 순서·아이콘은 첫 화면 업무 목록(home/tasks.ts)과 같다.
+ * 보이는 이름은 짧게(2~4글자), 화면낭독기에는 뒤에 나머지 이름을 이어 읽힌다(보이는 글자가 접근 이름의 앞에 오도록).
+ */
+const TASK_NAV: { route: Route; short: string; more: string }[] = [
+  { route: 'deduct', short: '공제', more: ' 문자 정리' },
+  { route: 'record', short: '기록', more: ' (방 상태 기록)' },
+  { route: 'lawyer', short: '변호사', more: ' 찾아보기' },
+  { route: 'help', short: '상담', more: ' 기관 안내' },
+  { route: 'cert', short: '내용증명', more: ' 서식' },
+  { route: 'event', short: '이벤트', more: ' (출시 기념)' },
+  { route: 'pricing', short: '가격', more: ' 안내' },
 ]
+const TASK_ICON = new Map(HOME_TASKS.map((t) => [t.route, t.icon]))
 
-/** 메뉴 줄이 넘칠 때(좁은 화면) 양끝 흐림 표시용 — 스크롤 위치를 data-edge 로 적는다 */
+/** 아이콘 줄이 넘칠 때(좁은 화면) 양끝 흐림 표시용 — 스크롤 위치를 data-edge 로 적는다 */
 function markEdges(nav: HTMLElement, wrap: HTMLElement) {
   const max = nav.scrollWidth - nav.clientWidth
   let edge = 'none'
@@ -186,9 +178,8 @@ function markEdges(nav: HTMLElement, wrap: HTMLElement) {
   wrap.dataset.edge = edge
 }
 
-function Header() {
-  const { route } = useRoute()
-  const current = (r: Route) => (route === r ? 'page' : undefined)
+/** 업무 바로가기 아이콘 줄 — 좁은 화면에서는 줄만 가로 스크롤(페이지는 스크롤되지 않음) */
+function TaskNav({ route }: { route: Route }) {
   const navRef = useRef<HTMLElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
 
@@ -205,7 +196,7 @@ function Header() {
     return () => window.removeEventListener('resize', refresh)
   }, [])
 
-  // 메뉴가 스크롤될 때는 현재 화면 항목이 보이도록 가운데로 옮긴다
+  // 줄이 스크롤될 때는 현재 화면 항목이 보이도록 가운데로 옮긴다
   useEffect(() => {
     const nav = navRef.current
     if (!nav || nav.scrollWidth - nav.clientWidth <= 1) return
@@ -219,14 +210,42 @@ function Header() {
   }, [route])
 
   return (
+    <div className="tasknav-wrap" ref={wrapRef}>
+      <nav
+        className="tasknav"
+        aria-label="업무 바로가기"
+        ref={navRef}
+        onScroll={(e) => {
+          if (wrapRef.current) markEdges(e.currentTarget, wrapRef.current)
+        }}
+      >
+        <ul className="tasknav-list">
+          {TASK_NAV.map((t) => {
+            const icon = TASK_ICON.get(t.route)
+            return (
+              <li key={t.route}>
+                <a className="tasknav-item" href={hrefOf(t.route)} aria-current={route === t.route ? 'page' : undefined}>
+                  <span className="tasknav-icon">{icon && <TaskIcon name={icon} size={24} />}</span>
+                  <span className="tasknav-label">
+                    {t.short}
+                    <span className="shell-sr">{t.more}</span>
+                  </span>
+                </a>
+              </li>
+            )
+          })}
+        </ul>
+      </nav>
+    </div>
+  )
+}
+
+function Header() {
+  const { route } = useRoute()
+  return (
     <>
       <div className="utility-bar">
         <div className="container utility-inner">
-          <a className="utility-event" href={hrefOf('event')} aria-current={current('event')}>
-            <IconGift />
-            <span>출시 기념 이벤트</span>
-            <IconChevron className="utility-chev" />
-          </a>
           <p className="utility-note">
             민간 학생 팀 서비스
             <span className="utility-note-more"> · 정부·공공기관 서비스가 아니에요</span>
@@ -235,34 +254,19 @@ function Header() {
       </div>
       <header className="topbar">
         <div className="container topbar-inner">
-          <a className="brand" href={hrefOf('home')} aria-current={current('home')}>
+          <a className="brand" href={hrefOf('home')} aria-current={route === 'home' ? 'page' : undefined}>
             <HouseMark />
             <span className="brand-name">보증금 지킴이</span>
           </a>
-          <div className="topnav-wrap" ref={wrapRef}>
-            <nav
-              className="topnav"
-              aria-label="주 메뉴"
-              ref={navRef}
-              onScroll={(e) => {
-                if (wrapRef.current) markEdges(e.currentTarget, wrapRef.current)
-              }}
-            >
-              {MENU.map((m) => (
-                <a key={m.route} href={hrefOf(m.route)} aria-current={current(m.route)}>
-                  {m.label}
-                </a>
-              ))}
-            </nav>
-          </div>
           <AccountLink active={route === 'signup'} />
         </div>
+        <TaskNav route={route} />
       </header>
     </>
   )
 }
 
-/* ── 바닥글: 링크 줄 · 고객센터 · 사업자 정보 · 고지 · 준수 표시 · 저작권 ───────── */
+/* ── 바닥글: 링크 줄 · 고객센터 · 사업자 정보 · 고지 · 서비스 메뉴 + 준수 표시 · 저작권 ───────── */
 
 /* 사업자 정보 — src/data/company.ts 의 값을 그대로 보여 준다(지어낸 번호 없음) */
 const BIZ_ROWS: { label: string; value: string; note?: string }[] = [
@@ -273,6 +277,15 @@ const BIZ_ROWS: { label: string; value: string; note?: string }[] = [
   { label: '통신판매업', value: COMPANY.mailOrder },
   { label: '호스팅', value: COMPANY.hosting },
   { label: '개인정보 보호 담당', value: COMPANY.privacyOfficer },
+]
+
+/* 서비스 메뉴 — 예전 상단 글자 메뉴. 가격 안내는 바닥글에 두지 않는다(헤더 아이콘 줄·첫 화면에서 연결) */
+const FOOTER_MENU: { route: Route; label: string }[] = [
+  { route: 'deduct', label: '공제 정리' },
+  { route: 'record', label: '방 상태 기록' },
+  { route: 'lawyer', label: '변호사 찾아보기' },
+  { route: 'help', label: '상담 기관' },
+  { route: 'cert', label: '내용증명' },
 ]
 
 function Footer() {
@@ -291,11 +304,6 @@ function Footer() {
             <li>
               <a href={hrefOf('event')} aria-current={current('event')}>
                 이벤트
-              </a>
-            </li>
-            <li>
-              <a href={hrefOf('help')} aria-current={current('help')}>
-                상담 기관 안내
               </a>
             </li>
             <li>
@@ -357,7 +365,24 @@ function Footer() {
           </p>
         </div>
 
-        <FooterCompliance />
+        <ServiceMarks variant="dark" />
+        <div className="footer-comply-area">
+          <nav className="footer-svc" aria-labelledby="footer-svc-title">
+            <h2 id="footer-svc-title" className="footer-svc-title">
+              서비스 메뉴
+            </h2>
+            <ul>
+              {FOOTER_MENU.map((m) => (
+                <li key={m.route}>
+                  <a href={hrefOf(m.route)} aria-current={current(m.route)}>
+                    {m.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+          <FooterCompliance />
+        </div>
         <p className="footer-copy">© 2026 보증금 지킴이 팀 · KOOKMIN AI BUILDER CHALLENGE 2026 출품작</p>
       </div>
     </footer>

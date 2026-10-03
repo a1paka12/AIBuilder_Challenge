@@ -1,17 +1,18 @@
 import HeroPreview from '../components/home/HeroPreview'
-import QuickMenu from '../components/home/QuickMenu'
 import ServiceGuide from '../components/home/ServiceGuide'
 import EventBand from '../components/home/EventBand'
 import { TaskIcon } from '../components/home/icons'
 import { go } from '../router'
 import TrustBadges from '../components/TrustBadges'
+import ServiceMarks from '../components/ServiceMarks'
 import Survey from '../components/Survey'
 import '../styles/home.css'
 
 /*
  * 첫 화면 (#/) — 은행·공공 누리집 첫 화면 꼴
- * 메인 비주얼(제목 · 보조 문장 · 버튼 4개 · 공제 문자→정리 표 그림) → 업무 바로가기 타일 → 이렇게 진행돼요(4단계, AI/내가)
+ * 메인 비주얼(제목 · 보조 문장 · 버튼 4개 · 공제 문자→정리 표 그림) → 서비스 원칙 마크 줄 → 이렇게 진행돼요(4단계, AI/내가)
  * → 업무별 안내(무엇을 / AI가 하는 일 / 내가 하는 일 / 비용 / 자세히 보기) → 이용 안내 → 이벤트 띠 → 보증금 지킴이의 약속 → 30초 현장 설문
+ * 업무 바로가기는 모든 화면 공통으로 헤더 바로 아래 아이콘 줄(App.tsx TaskNav)에 있다.
  * h1 은 메인 비주얼 제목 하나. 레이어 팝업(PromoPopup)은 App 에서 route==='home' 일 때만 띄운다(이 파일이 아님).
  * 자동 넘김 캐러셀 없음(정적 한 장). 숫자는 PRD 예시·가격 가설·/api/stats 실제 값만.
  */
@@ -89,10 +90,9 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 2) 업무 바로가기 */}
-      <QuickMenu />
+      <ServiceMarks variant="light" />
 
-      {/* 3) 아래 상세 — 진행 4단계 */}
+      {/* 2) 이렇게 진행돼요 — 진행 4단계 (업무 바로가기는 헤더 아래 아이콘 줄로 옮김) */}
       <section className="home-steps-sec" aria-labelledby="home-steps-title">
         <div className="section-head">
           <h2 id="home-steps-title">이렇게 진행돼요</h2>

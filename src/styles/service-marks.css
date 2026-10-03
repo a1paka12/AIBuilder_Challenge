@@ -1,0 +1,167 @@
+/*
+ * 서비스 원칙 마크 줄 (ServiceMarks.tsx)
+ * 대비(아이콘 선 대 타일 배경):
+ *   light: #0b4ea2 on #eef4fc ≈ 7.6:1 · 툴팁 흰 글자 on #0f2747 ≈ 15:1
+ *   dark : #9dbcf0 on #30353d ≈ 7.0:1 · 툴팁 #1e2124 on #ffffff ≈ 16:1
+ * 둥근 사각형 타일만 쓴다(원형 도장·방패·톱니 테두리 금지).
+ */
+.smarks {
+  --sm-size: 56px;
+  --sm-gap: 16px;
+  --sm-icon: var(--primary, #0b4ea2);
+  --sm-bg: var(--primary-soft, #eef4fc);
+  --sm-border: #cfdcef;
+  --sm-hover-border: var(--primary, #0b4ea2);
+  --sm-tip-bg: var(--navy, #0f2747);
+  --sm-tip-text: #ffffff;
+  --sm-focus: var(--focus, #1f6feb);
+
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--sm-gap);
+  margin: 24px auto;
+  padding: 0;
+  list-style: none;
+}
+
+.smarks--dark {
+  --sm-icon: #9dbcf0;
+  --sm-bg: #30353d;
+  --sm-border: rgba(255, 255, 255, 0.16);
+  --sm-hover-border: #9dbcf0;
+  --sm-tip-bg: #ffffff;
+  --sm-tip-text: #1e2124;
+  --sm-focus: #8fb6ff;
+  margin: 20px auto 4px;
+}
+
+.smarks-item {
+  position: relative;
+  margin: 0;
+  padding: 0;
+}
+.smarks-item::before {
+  content: none;
+}
+
+.smarks-tile {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--sm-size);
+  height: var(--sm-size);
+  border: 1px solid var(--sm-border);
+  border-radius: 12px;
+  background: var(--sm-bg);
+  color: var(--sm-icon);
+  cursor: default;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.smarks-tile svg {
+  display: block;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  color: var(--sm-icon);
+}
+.smarks-tile:hover {
+  border-color: var(--sm-hover-border);
+}
+.smarks-tile:focus {
+  outline: none;
+}
+.smarks-tile:focus-visible {
+  outline: 3px solid var(--sm-focus);
+  outline-offset: 2px;
+  border-color: var(--sm-hover-border);
+}
+
+/* 툴팁 — hover/focus 때만 이름 표시 */
+.smarks-tile::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  z-index: 20;
+  width: max-content;
+  max-width: 200px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--sm-tip-bg);
+  color: var(--sm-tip-text);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+  letter-spacing: -0.01em;
+  text-align: center;
+  white-space: normal;
+  word-break: keep-all;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transform: translate(-50%, 4px);
+  transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s;
+}
+.smarks-tile:hover::after,
+.smarks-tile:focus-visible::after {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, 0);
+}
+
+/* 가장자리 마크는 툴팁이 화면 밖으로 나가지 않게 한쪽 정렬 */
+.smarks-item:first-child .smarks-tile::after {
+  left: 0;
+  transform: translate(0, 4px);
+}
+.smarks-item:first-child .smarks-tile:hover::after,
+.smarks-item:first-child .smarks-tile:focus-visible::after {
+  transform: translate(0, 0);
+}
+.smarks-item:last-child .smarks-tile::after {
+  left: auto;
+  right: 0;
+  transform: translate(0, 4px);
+}
+.smarks-item:last-child .smarks-tile:hover::after,
+.smarks-item:last-child .smarks-tile:focus-visible::after {
+  transform: translate(0, 0);
+}
+
+@media (max-width: 600px) {
+  .smarks {
+    --sm-size: 48px;
+    --sm-gap: 12px;
+  }
+  .smarks-tile svg {
+    width: 22px;
+    height: 22px;
+  }
+  .smarks-tile::after {
+    max-width: 160px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .smarks-tile,
+  .smarks-tile::after {
+    transition: none;
+  }
+  .smarks-tile::after,
+  .smarks-tile:hover::after,
+  .smarks-tile:focus-visible::after,
+  .smarks-item:first-child .smarks-tile::after,
+  .smarks-item:first-child .smarks-tile:hover::after,
+  .smarks-item:first-child .smarks-tile:focus-visible::after,
+  .smarks-item:last-child .smarks-tile::after,
+  .smarks-item:last-child .smarks-tile:hover::after,
+  .smarks-item:last-child .smarks-tile:focus-visible::after {
+    transform: none;
+  }
+  .smarks-item:not(:first-child):not(:last-child) .smarks-tile::after {
+    transform: translateX(-50%);
+  }
+}

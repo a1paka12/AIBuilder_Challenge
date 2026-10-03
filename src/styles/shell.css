@@ -1,5 +1,5 @@
 /*
- * 앱 껍데기 — 유틸리티 띠 · GNB(상단 메뉴) · 바닥글(고객센터·사업자 정보) · 화면 이동 포커스 표시
+ * 앱 껍데기 — 고지 띠 · 헤더(로고·계정) · 업무 바로가기 아이콘 줄 · 바닥글(서비스 메뉴·고객센터·사업자 정보) · 화면 이동 포커스 표시
  * index.css 는 손대지 않고, 이 파일이 뒤에 읽히면서 같은 이름의 규칙을 덮어쓴다.
  * 토큰: --primary --primary-dark --primary-soft --navy --line --muted --surface --bg --footer-bg --footer-text --radius --radius-sm
  * 어두운 바닥글(#252a32) 위 대비: 흰 글자 14.4:1 · #c3c9d2 8.7:1 · 링크 #8fb6ff 7.1:1 · 보조 #a3abb6 6.2:1 · 저작권 #98a0ab 5.4:1
@@ -26,45 +26,19 @@
   outline-offset: 6px;
 }
 
-/* ── 유틸리티 띠 (남색) ─────────────────────────────────────────────── */
-.utility-inner {
-  flex-wrap: wrap;
-  gap: 4px 12px;
-}
-.utility-event {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 44px; /* 띠는 32px 그대로, 누르는 영역만 44px */
-  margin: -6px 0;
-  padding: 0 2px;
-  color: #fff;
-  font-weight: 700;
-  font-size: 13px;
-  text-decoration: none;
-  white-space: nowrap;
-  border-radius: var(--radius-sm);
-}
-.utility-event:hover,
-.utility-event[aria-current='page'] {
-  color: #fff;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-.utility-event svg {
-  flex: none;
-}
-.utility-event .utility-chev {
-  color: #9dbcf0;
-}
+/* ── 고지 띠 (남색) — 고지 문구만 ─────────────────────────────────── */
 .utility-bar .utility-note {
   flex: 1 1 auto;
   margin: 0;
-  text-align: right;
   color: #dfe6f0;
 }
+@media (max-width: 640px) {
+  .utility-note-more {
+    display: none; /* 전체 문장은 바닥글 고지에 있다 */
+  }
+}
 
-/* ── GNB ──────────────────────────────────────────────────────────── */
+/* ── 헤더 위쪽 줄: 로고 · 계정 버튼 ─────────────────────────────────── */
 .topbar-inner {
   min-width: 0;
 }
@@ -72,138 +46,154 @@
   flex: none;
   text-decoration: none;
 }
-.topnav-wrap {
-  position: relative;
-  min-width: 0;
-}
-.topnav {
-  position: relative;
-  display: flex;
-  align-items: stretch;
-  gap: 4px;
-  min-width: 0;
-}
-.topnav a {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 10px 14px;
-  min-height: 44px;
-  border-radius: var(--radius-sm);
-  color: var(--text);
-  font-weight: 600;
-  font-size: 16px;
-  text-decoration: none;
-  white-space: nowrap;
-  transition: background-color 0.12s, color 0.12s;
-}
-.topnav a:hover {
-  color: var(--primary);
-  background: var(--primary-soft);
-}
-.topnav a[aria-current='page'] {
-  color: var(--primary);
-  font-weight: 700;
-}
-.topnav a[aria-current='page']::after {
-  content: '';
-  position: absolute;
-  left: 14px;
-  right: 14px;
-  bottom: 2px;
-  height: 3px;
-  background: var(--primary);
-  border-radius: 2px;
-}
-
-/* 메뉴 줄이 넘쳐 스크롤될 때 양끝 흐림(스크롤이 더 있다는 표시). data-edge 는 App.tsx 가 적는다 */
-.topnav-wrap::before,
-.topnav-wrap::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 32px;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.15s;
-}
-.topnav-wrap::before {
-  left: 0;
-  background: linear-gradient(to right, var(--surface) 20%, rgba(255, 255, 255, 0));
-}
-.topnav-wrap::after {
-  right: 0;
-  background: linear-gradient(to left, var(--surface) 20%, rgba(255, 255, 255, 0));
-}
-.topnav-wrap[data-edge='mid']::before,
-.topnav-wrap[data-edge='end']::before,
-.topnav-wrap[data-edge='mid']::after,
-.topnav-wrap[data-edge='start']::after {
-  opacity: 1;
-}
-
-/* 중간 폭: 브랜드 + 5개 메뉴가 한 줄에 들어가도록 여백만 줄인다 */
-@media (max-width: 900px) {
-  .topnav a {
-    padding: 10px 12px;
-  }
-  .topnav a[aria-current='page']::after {
-    left: 12px;
-    right: 12px;
-  }
-}
-
-/* 휴대폰·좁은 창: 브랜드 한 줄 + 메뉴 한 줄. 메뉴가 넘치면 메뉴 줄만 가로 스크롤(페이지는 스크롤되지 않음) */
 @media (max-width: 760px) {
+  .topbar {
+    position: static; /* 휴대폰에서는 헤더(로고 줄 + 아이콘 줄)가 화면을 덜 가리도록 고정하지 않는다 */
+  }
   .topbar-inner {
-    flex-wrap: wrap;
-    gap: 0;
-    min-height: 0;
-    padding-top: 6px;
+    flex-wrap: nowrap;
+    gap: 8px;
+    min-height: 52px;
+    padding-top: 4px;
+    padding-bottom: 4px;
   }
   .brand {
     font-size: 18px;
   }
-  .topnav-wrap {
-    width: calc(100% + 32px);
-    margin: 4px -16px 0;
-    border-top: 1px solid var(--line);
-  }
-  .topnav {
-    width: auto;
-    margin: 0;
-    gap: 0;
-    padding: 0 8px;
-    border-top: 0;
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    scrollbar-width: none;
-  }
-  .topnav::-webkit-scrollbar {
-    display: none;
-  }
-  .topnav a {
-    flex: 1 0 auto; /* 남는 폭은 나눠 갖고, 모자라면 줄이지 않고 스크롤 */
-    padding: 10px 8px;
-    min-height: 46px;
-    font-size: 14px;
-    border-radius: 0;
-  }
-  .topnav a:focus-visible {
-    outline-offset: -3px; /* 스크롤 영역 안에서 포커스 테두리가 잘리지 않게 안쪽으로 */
-  }
-  .topnav a[aria-current='page']::after {
-    left: 0;
-    right: 0;
-    bottom: 0;
-    border-radius: 0;
-  }
 }
-@media (max-width: 640px) {
-  .utility-note-more {
-    display: none; /* 전체 문장은 바닥글 고지에 있다 */
+
+/* ── 업무 바로가기 아이콘 줄 (헤더 바로 아래) ─────────────────────────
+ * 선 아이콘 24px 위 + 짧은 이름 아래. 글자 #1e2124 흰 바탕 16.1:1 · 현재 항목 #0b4ea2 7.6:1 · 아이콘 #545b66 7.0:1
+ * 넓은 화면: 가운데 정렬 한 줄. 좁은 화면: 줄만 가로 스크롤, 양끝 흐림(data-edge 는 App.tsx 가 적는다)
+ */
+.tasknav-wrap {
+  position: relative;
+  border-top: 1px solid var(--line);
+}
+.tasknav {
+  max-width: var(--container);
+  margin: 0 auto;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+.tasknav::-webkit-scrollbar {
+  display: none;
+}
+.tasknav-list {
+  list-style: none;
+  margin: 0 auto;
+  padding: 0 16px;
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  width: max-content;
+  min-width: 100%;
+  box-sizing: border-box;
+}
+.tasknav-list li {
+  flex: none;
+  display: flex;
+}
+.tasknav-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 84px;
+  min-height: 64px;
+  padding: 8px 10px 10px;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color 0.12s, color 0.12s;
+}
+.tasknav-icon {
+  display: inline-flex;
+  color: var(--muted);
+  transition: color 0.12s;
+}
+.tasknav-icon svg {
+  width: 24px;
+  height: 24px;
+}
+.tasknav-item:hover {
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+.tasknav-item:hover .tasknav-icon,
+.tasknav-item[aria-current='page'] .tasknav-icon {
+  color: var(--primary);
+}
+.tasknav-item[aria-current='page'] {
+  color: var(--primary);
+  font-weight: 700;
+}
+.tasknav-item[aria-current='page']::after {
+  content: '';
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 0;
+  height: 3px;
+  background: var(--primary);
+  border-radius: 2px 2px 0 0;
+}
+.tasknav-item:focus-visible {
+  outline-offset: -3px; /* 스크롤 영역 안에서 포커스 테두리가 잘리지 않게 안쪽으로 */
+}
+
+/* 양끝 흐림 — 줄이 넘쳐 스크롤이 더 있을 때만 */
+.tasknav-wrap::before,
+.tasknav-wrap::after {
+  content: '';
+  position: absolute;
+  top: 1px;
+  bottom: 0;
+  z-index: 1;
+  width: 28px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+.tasknav-wrap::before {
+  left: 0;
+  background: linear-gradient(to right, var(--surface) 15%, rgba(255, 255, 255, 0));
+}
+.tasknav-wrap::after {
+  right: 0;
+  background: linear-gradient(to left, var(--surface) 15%, rgba(255, 255, 255, 0));
+}
+.tasknav-wrap[data-edge='mid']::before,
+.tasknav-wrap[data-edge='end']::before,
+.tasknav-wrap[data-edge='mid']::after,
+.tasknav-wrap[data-edge='start']::after {
+  opacity: 1;
+}
+
+/* 휴대폰: 칸을 줄여 7개 중 5~6개가 보이고 나머지는 밀어서 본다(마지막 칸이 반쯤 보여 더 있음을 알린다) */
+@media (max-width: 760px) {
+  .tasknav-list {
+    justify-content: flex-start;
+    gap: 0;
+    padding: 0 6px;
+  }
+  .tasknav-item {
+    min-width: 60px;
+    min-height: 60px;
+    padding: 7px 8px 9px;
+    font-size: 13px;
+    border-radius: 0;
+  }
+  .tasknav-item[aria-current='page']::after {
+    left: 6px;
+    right: 6px;
   }
 }
 
@@ -237,7 +227,7 @@
   color: var(--ft-icon);
 }
 
-/* 링크 줄: 개인정보 처리방침(강조) · 이벤트 · 상담 기관 안내 · GitHub 저장소 */
+/* 링크 줄: 개인정보 처리방침(강조) · 이벤트 · GitHub 저장소 */
 .footer-links {
   padding-bottom: 10px;
   border-bottom: 1px solid var(--ft-line);
@@ -393,6 +383,66 @@
   margin: 0 0 4px;
 }
 
+/* 서비스 메뉴 + 준수·점검 표시 — 같은 영역(서비스 메뉴가 위, 준수 표시가 아래) */
+.footer-comply-area {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--ft-line);
+}
+.footer-svc {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 16px;
+}
+.footer .footer-svc-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--ft-strong);
+}
+.footer-svc ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 4px;
+}
+.footer-svc li {
+  display: inline-flex;
+  align-items: center;
+}
+.footer-svc li + li::before {
+  content: '';
+  display: inline-block;
+  width: 1px;
+  height: 12px;
+  margin: 0 10px 0 6px;
+  background: var(--ft-line);
+}
+.footer-svc a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 2px;
+  color: var(--ft-text);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+}
+.footer-svc a:hover,
+.footer-svc a[aria-current='page'] {
+  color: #fff;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.footer-comply-area .fc {
+  margin-top: 8px;
+}
+
 /* 저작권 (index.css 의 margin-top 10px 유지) */
 .footer .footer-copy {
   padding-top: 4px;
@@ -406,6 +456,17 @@
   }
   .footer-links li + li::before {
     margin: 0 8px 0 4px;
+  }
+  /* 서비스 메뉴는 좁은 화면에서 두 줄로 접히므로 구분선 대신 간격만 둔다(줄 머리에 구분선이 남지 않게) */
+  .footer-svc {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .footer-svc ul {
+    gap: 0 18px;
+  }
+  .footer-svc li + li::before {
+    content: none;
   }
   .footer-grid {
     grid-template-columns: minmax(0, 1fr);
@@ -423,9 +484,10 @@
 
 /* 움직임 줄이기 */
 @media (prefers-reduced-motion: reduce) {
-  .topnav a,
-  .topnav-wrap::before,
-  .topnav-wrap::after {
+  .tasknav-item,
+  .tasknav-icon,
+  .tasknav-wrap::before,
+  .tasknav-wrap::after {
     transition: none;
   }
 }
