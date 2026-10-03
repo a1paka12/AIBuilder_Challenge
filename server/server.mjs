@@ -414,8 +414,24 @@ const insUser = db.prepare(`INSERT INTO users (provider, email, password_hash, g
   VALUES (?, ?, ?, ?, ?, ?, ?)`)
 const touchUser = db.prepare('UPDATE users SET last_login_at = ? WHERE id = ?')
 const delUser = db.prepare('DELETE FROM users WHERE id = ?')
-const qUsersTotal = db.prepare('SELECT COUNT(*) AS n FROM users')
-const publicUser = (u) => ({ id: u.id, email: u.email, provider: u.provider, createdAt: u.created_at })
+const qUsersTotal = db.prepare('SELECT COUNT(*) AS n FROM users WHERE email != ?')
+
+// 심사용 공용 테스트 계정: TEST_ACCOUNT_ID·TEST_ACCOUNT_PASSWORD 가 둘 다 있을 때만 시작 시 보장한다(값은 .env 에만).
+const TEST_ACCOUNT_ID = normEmail(process.env.TEST_ACCOUNT_ID)
+const TEST_ACCOUNT_PASSWORD = process.env.TEST_ACCOUNT_PASSWORD || ''
+const TEST_ACCOUNT_ON = Boolean(TEST_ACCOUNT_ID && TEST_ACCOUNT_PASSWORD)
+const isTestAccount = (u) => Boolean(TEST_ACCOUNT_ON && u && u.email === TEST_ACCOUNT_ID)
+if (TEST_ACCOUNT_ON) {
+  const now = new Date().toISOString()
+  const existing = selUserByEmail.get(TEST_ACCOUNT_ID)
+  if (existing) {
+    db.prepare("UPDATE users SET provider = 'email', password_hash = ?, google_sub = NULL WHERE id = ?").run(hashPassword(TEST_ACCOUNT_PASSWORD), existing.id)
+  } else {
+    insUser.run('email', TEST_ACCOUNT_ID, hashPassword(TEST_ACCOUNT_PASSWORD), null, CONSENT_VERSION, now, now)
+  }
+  console.log('[bojeung] test account ensured')
+}
+const publicUser = (u) => ({ id: u.id, email: u.email, provider: u.provider, createdAt: u.created_at, isTestAccount: isTestAccount(u) })
 
 // 쿠키 검증 → 사용자 행 (없거나 위조·만료면 null)
 function sessionUser(req) {
@@ -455,7 +471,9 @@ app.post('/api/auth/signup', (req, res) => {
 app.post('/api/auth/login', (req, res) => {
   const email = normEmail(req.body?.email)
   const password = req.body?.password
-  const u = email ? selUserByEmail.get(email) : null
+  // 일반 계정은 이메일 형식만, 테스트 아이디는 형식 예외(비밀번호 길이 검사는 로그인에서 하지 않음)
+  const idOk = email && email.length <= 254 && (EMAIL_RE.test(email) || (TEST_ACCOUNT_ON && email === TEST_ACCOUNT_ID))
+  const u = idOk ? selUserByEmail.get(email) : null
   if (u && u.provider === 'google') return res.status(401).json({ error: 'use_google' })
   if (!u || typeof password !== 'string' || !verifyPassword(password, u.password_hash)) return res.status(401).json({ error: 'invalid_credentials' })
   touchUser.run(new Date().toISOString(), u.id)
@@ -519,6 +537,7 @@ app.post('/api/auth/logout', (req, res) => {
 
 app.delete('/api/me', (req, res) => {
   const u = sessionUser(req)
+  if (isTestAccount(u)) return res.status(403).json({ error: 'test_account_locked', message: '공용 테스트 계정은 탈퇴할 수 없어요.' })
   if (u) {
     deleteUserPhotos(u.id)
     delUser.run(u.id)
@@ -798,7 +817,7 @@ function getStats() {
   for (const r of qMetricsTotal.all()) total[r.event] = r.n
   const today = {}
   for (const r of qMetricsToday.all(kstDay())) today[r.event] = r.n
-  return { intents, survey, metrics: { today, total }, prices: PRICES, users: { total: qUsersTotal.get().n } }
+  return { intents, survey, metrics: { today, total }, prices: PRICES, users: { total: qUsersTotal.get(TEST_ACCOUNT_ON ? TEST_ACCOUNT_ID : '').n } }
 }
 app.get('/api/stats', (_req, res) => res.json(getStats()))
 

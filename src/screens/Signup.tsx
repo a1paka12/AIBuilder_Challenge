@@ -14,6 +14,7 @@ import {
   looksLikeEmail,
   PASSWORD_MIN,
   PROVIDER_LABEL,
+  TEST_ACCOUNT_NOTICE,
   signup,
   useMe,
   type Consent,
@@ -444,7 +445,7 @@ function LoginPanel({ config, onLoggedIn, toSignup }: { config: ConfigState; onL
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     const next: typeof errs = {}
-    if (!looksLikeEmail(email)) next.email = '이메일 주소 형식을 확인해 주세요.'
+    if (!email.trim()) next.email = '이메일(또는 테스트 아이디)을 입력해 주세요.'
     if (!pw) next.pw = '비밀번호를 입력해 주세요.'
     setErrs(next)
     if (next.email || next.pw) {
@@ -496,8 +497,8 @@ function LoginPanel({ config, onLoggedIn, toSignup }: { config: ConfigState; onL
       <form className="su-form su-form-flat" noValidate onSubmit={submit} aria-label="이메일로 로그인">
         <Field
           id={`${uid}-email`}
-          label="이메일"
-          type="email"
+          label="이메일(또는 테스트 아이디)"
+          type="text"
           inputMode="email"
           value={email}
           onChange={setEmail}
@@ -596,6 +597,11 @@ function AccountPanel({ user, onLoggedOut, onDeleted }: { user: User; onLoggedOu
       <h2 id={`${uid}-title`} className="su-sec-title">
         계정 정보
       </h2>
+      {user.isTestAccount && (
+        <p className="notice warn su-test-notice" role="note">
+          {TEST_ACCOUNT_NOTICE}
+        </p>
+      )}
       <dl className="su-terms su-account">
         <div>
           <dt>이메일</dt>
@@ -616,14 +622,15 @@ function AccountPanel({ user, onLoggedOut, onDeleted }: { user: User; onLoggedOu
         <button type="button" className="btn" onClick={() => void doLogout()} disabled={busy}>
           로그아웃
         </button>
-        {!confirming && (
+        {!confirming && !user.isTestAccount && (
           <button ref={deleteBtn} type="button" className="btn su-danger-ghost" onClick={() => setConfirming(true)} disabled={busy}>
             회원 탈퇴
           </button>
         )}
       </div>
 
-      {confirming && (
+      {user.isTestAccount && <p className="su-hint">공용 테스트 계정은 탈퇴할 수 없어요.</p>}
+      {confirming && !user.isTestAccount && (
         <div className="notice warn su-confirm" role="group" aria-labelledby={`${uid}-confirm`}>
           <h3 id={`${uid}-confirm`} ref={confirmTitle} tabIndex={-1} className="su-confirm-title">
             정말 탈퇴할까요?

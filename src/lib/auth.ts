@@ -14,6 +14,8 @@ export interface User {
   email: string
   provider: AuthProvider
   createdAt: string
+  /** 심사용 공용 테스트 계정 — 탈퇴 불가, 사진이 다른 사람에게도 보임 */
+  isTestAccount?: boolean
 }
 
 export interface Consent {
@@ -39,6 +41,7 @@ const ERROR_TEXT: Record<string, string> = {
   email_exists_password: '이 이메일은 이메일·비밀번호로 가입돼 있어요. 로그인 탭에서 이메일로 로그인해 주세요.',
   google_not_configured: '구글 간편 가입은 아직 준비 중이에요. 이메일로 가입해 주세요.',
   invalid_token: '구글 계정 확인에 실패했어요. 다시 시도해 주세요.',
+  test_account_locked: '공용 테스트 계정은 탈퇴할 수 없어요.',
   rate_limited: '요청이 너무 잦아요. 1분쯤 뒤에 다시 시도해 주세요.',
   http_429: '요청이 너무 잦아요. 1분쯤 뒤에 다시 시도해 주세요.',
   network: '연결이 불안정해요. 잠시 후 다시 시도해 주세요.',
@@ -58,6 +61,8 @@ export function authErrorCode(e: unknown): string {
 export function looksLikeEmail(v: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim())
 }
+
+export const TEST_ACCOUNT_NOTICE = '공용 테스트 계정이에요 — 저장한 사진은 같은 계정으로 들어온 다른 사람도 볼 수 있어요. 개인 사진은 올리지 마세요.'
 
 /* ── 요청 도우미 ─────────────────────────────────────────────────── */
 

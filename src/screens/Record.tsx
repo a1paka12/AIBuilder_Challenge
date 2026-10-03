@@ -8,7 +8,7 @@ import { ApiFailure, createReceipt, formatKST, postMetric } from '../api'
 import type { Phase, RoomPhoto, Zone } from '../types'
 import { maskableType } from '../lib/imageMask'
 import { usePromoUnlocked } from '../lib/promo'
-import { refreshMe, useMe, type User } from '../lib/auth'
+import { refreshMe, TEST_ACCOUNT_NOTICE, useMe, type User } from '../lib/auth'
 import {
   RETENTION_TEXT,
   SERVER_LIMIT,
@@ -599,6 +599,11 @@ export default function RecordScreen() {
     <section className="record">
       <header className="rc-head">
         <h1>방 상태 기록</h1>
+        {user?.isTestAccount && (
+          <p className="notice warn rc-notice" role="note">
+            <b>{TEST_ACCOUNT_NOTICE}</b>
+          </p>
+        )}
         {serverMode ? (
           <div className="notice rc-notice">
             <p>

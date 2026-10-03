@@ -551,3 +551,9 @@
     transition: none;
   }
 }
+
+/* 공용 테스트 계정 안내 */
+.su-test-notice {
+  margin: 0 0 12px;
+  font-weight: 600;
+}
