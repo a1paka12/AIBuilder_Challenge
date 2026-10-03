@@ -1,0 +1,875 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>보증금 지킴이 발표</title>
+<meta name="description" content="보증금 지킴이 5분 발표 자료 — 퇴실 공제 통보, 물어볼 근거를 3분 만에">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+  :root {
+    --blue: #2457d6;
+    --blue-d: #1b44ad;
+    --blue-soft: #edf2fd;
+    --blue-line: #c8d6f6;
+    --ink: #121826;
+    --sub: #364052;
+    --muted: #697283;
+    --line: #e3e7ee;
+    --paper: #ffffff;
+    --frame: #eef1f6;
+    --soft: #f6f8fb;
+    --warn: #9a5200;
+    --warn-soft: #fff3df;
+    --ok: #11713f;
+    --ok-soft: #e4f4ea;
+    --no: #a8261b;
+    --no-soft: #fcecea;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    background: var(--frame);
+    color: var(--ink);
+    font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    word-break: keep-all;
+    overflow-wrap: break-word;
+    overflow: hidden;
+    touch-action: pan-y;
+  }
+  a { color: inherit; }
+
+  /* ---------- stage ---------- */
+  .deck {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    width: 1280px;
+    height: 720px;
+    transform: translate(-50%, -50%) scale(var(--s, 1));
+    transform-origin: center center;
+  }
+  .slide {
+    position: absolute;
+    inset: 0;
+    background: var(--paper);
+    display: none;
+    flex-direction: column;
+    padding: 60px 88px 80px;
+    overflow: hidden;
+    box-shadow: 0 12px 44px rgba(18, 24, 38, .10);
+  }
+  .slide.active { display: flex; animation: enter .32s ease both; }
+  @keyframes enter { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  .slide::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 0;
+    width: 100%; height: 8px;
+    background: var(--blue);
+  }
+  .slide.cover::before { width: 16px; height: 100%; }
+
+  .kicker {
+    font-size: 19px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    color: var(--blue);
+    margin-bottom: 12px;
+  }
+  h2 {
+    font-size: 48px;
+    font-weight: 800;
+    line-height: 1.2;
+    letter-spacing: -.025em;
+    margin-bottom: 30px;
+  }
+  h2 em { font-style: normal; color: var(--blue); }
+  .body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .foot {
+    position: absolute;
+    left: 88px; right: 88px; bottom: 26px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 16px;
+    color: var(--muted);
+  }
+  .foot .num { font-weight: 700; color: var(--blue); font-variant-numeric: tabular-nums; }
+  .src { font-size: 15px; color: var(--muted); line-height: 1.45; }
+  .muted { color: var(--muted); }
+  .c-blue { color: var(--blue); }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 12px; border-radius: 999px;
+    font-size: 16px; font-weight: 700; white-space: nowrap;
+    background: var(--blue-soft); color: var(--blue-d);
+  }
+  .badge.warn { background: var(--warn-soft); color: var(--warn); }
+  .badge.ok { background: var(--ok-soft); color: var(--ok); }
+  .badge.no { background: var(--no-soft); color: var(--no); }
+  .badge.gray { background: var(--soft); color: var(--sub); border: 1px solid var(--line); }
+
+  .card {
+    background: var(--paper);
+    border: 1.5px solid var(--line);
+    border-radius: 20px;
+    padding: 26px 28px;
+  }
+  .card.soft { background: var(--soft); border-color: var(--soft); }
+  .card.blue { background: var(--blue-soft); border-color: var(--blue-line); }
+  .card.solid { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .card h3 { font-size: 26px; font-weight: 800; margin-bottom: 14px; letter-spacing: -.01em; }
+
+  ul.list { list-style: none; display: grid; gap: 12px; }
+  ul.list li { position: relative; padding-left: 22px; font-size: 23px; line-height: 1.4; color: var(--sub); }
+  ul.list li::before {
+    content: ""; position: absolute; left: 0; top: .62em;
+    width: 8px; height: 8px; border-radius: 50%; background: var(--blue);
+  }
+  .card.solid ul.list li { color: #fff; }
+  .card.solid ul.list li::before { background: #fff; }
+  ul.list.no li::before { background: var(--no); border-radius: 2px; width: 10px; height: 3px; top: .7em; }
+
+  .grid { display: grid; gap: 22px; }
+  .g2 { grid-template-columns: 1fr 1fr; }
+  .g3 { grid-template-columns: repeat(3, 1fr); }
+
+  /* ---------- 1 cover ---------- */
+  .cover { padding: 64px 88px 80px 112px; }
+  .cover .wrap { flex: 1; display: grid; grid-template-columns: 1.15fr .85fr; gap: 48px; align-items: center; }
+  .cover .event { font-size: 21px; font-weight: 600; color: var(--muted); margin-bottom: 30px; }
+  .cover h1 { font-size: 108px; font-weight: 900; letter-spacing: -.04em; line-height: 1.02; }
+  .cover h1 span { color: var(--blue); }
+  .cover .tag { margin-top: 26px; font-size: 38px; font-weight: 700; line-height: 1.3; letter-spacing: -.02em; color: var(--sub); }
+  .cover .url {
+    margin-top: 44px; display: inline-flex; align-items: center; gap: 12px;
+    padding: 14px 22px; border-radius: 14px; background: var(--blue-soft);
+    font-size: 22px; font-weight: 700; color: var(--blue-d); text-decoration: none;
+  }
+  .cover .url svg { flex: none; }
+  .mini { display: grid; gap: 16px; }
+  .bubble {
+    position: relative; align-self: start; max-width: 100%;
+    background: var(--soft); border: 1.5px solid var(--line);
+    border-radius: 22px 22px 22px 6px; padding: 18px 22px;
+    font-size: 21px; line-height: 1.5; color: var(--sub);
+  }
+  .bubble .who { display: block; font-size: 15px; font-weight: 700; color: var(--muted); margin-bottom: 4px; }
+  .arrow-down { justify-self: center; color: var(--blue); }
+  .mtable { border: 1.5px solid var(--blue-line); border-radius: 18px; overflow: hidden; background: #fff; }
+  .mtable .r { display: grid; grid-template-columns: 1fr auto; gap: 12px; padding: 12px 20px; font-size: 20px; border-top: 1px solid var(--line); align-items: center; }
+  .mtable .r:first-child { border-top: 0; }
+  .mtable .r b { font-variant-numeric: tabular-nums; }
+  .mtable .r.pick { background: var(--blue-soft); color: var(--blue-d); font-weight: 700; }
+  .mtable .r.sum { background: var(--blue); color: #fff; font-weight: 700; }
+
+  /* ---------- 2 who ---------- */
+  .who-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+  .who-line { font-size: 27px; font-weight: 700; line-height: 1.4; margin-bottom: 20px; }
+  .who-line span { color: var(--blue); }
+  .chat { background: #fef6c9; border: 0; border-radius: 22px 22px 22px 6px; padding: 20px 24px; font-size: 24px; line-height: 1.5; color: #3a3110; }
+  .chat .who { display: block; font-size: 16px; font-weight: 700; color: #7a6a20; margin-bottom: 6px; }
+  .chores { display: grid; gap: 12px; counter-reset: c; }
+  .chores li {
+    list-style: none; counter-increment: c;
+    display: flex; align-items: center; gap: 16px;
+    padding: 14px 20px; border-radius: 16px; background: var(--soft);
+    font-size: 25px; font-weight: 700; color: var(--sub);
+  }
+  .chores li::before {
+    content: counter(c); flex: none;
+    width: 36px; height: 36px; border-radius: 50%;
+    display: grid; place-items: center;
+    background: var(--blue); color: #fff; font-size: 18px; font-weight: 800;
+  }
+  .quote {
+    margin-top: 26px; padding: 20px 28px; border-left: 6px solid var(--blue);
+    background: var(--blue-soft); border-radius: 0 16px 16px 0;
+    font-size: 25px; font-weight: 600; line-height: 1.45; color: var(--ink);
+  }
+  .quote cite { display: block; margin-top: 6px; font-size: 16px; font-style: normal; font-weight: 500; color: var(--muted); }
+
+  /* ---------- 3 numbers ---------- */
+  .stats { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; flex: 1; gap: 18px; }
+  .stats .card { padding: 20px 26px; }
+  .stat { display: flex; flex-direction: column; justify-content: center; }
+  .stat .n { font-size: 58px; font-weight: 900; letter-spacing: -.03em; line-height: 1; color: var(--blue); font-variant-numeric: tabular-nums; }
+  .stat .n small { font-size: 32px; font-weight: 800; }
+  .stat .t { margin-top: 12px; font-size: 22px; font-weight: 600; line-height: 1.4; color: var(--ink); }
+  .stat .src { margin-top: 8px; }
+  .stat .pair { display: flex; gap: 34px; align-items: flex-end; }
+  .stat .pair .lab { font-size: 17px; font-weight: 700; color: var(--muted); margin-top: 6px; }
+
+  /* ---------- 4 roles ---------- */
+  .roles { align-items: stretch; }
+  .roles .card { min-height: 300px; padding: 30px 30px; }
+  .roles ul.list li { font-size: 25px; }
+  .center-body { justify-content: center; }
+  .role { display: flex; flex-direction: column; }
+  .role .who { font-size: 18px; font-weight: 800; letter-spacing: .04em; margin-bottom: 10px; }
+  .role.ai .who { color: var(--blue); }
+  .role.me .who { color: var(--ok); }
+  .role.not .who { color: var(--no); }
+  .role h3 { font-size: 30px; }
+  .role.not { background: var(--no-soft); border-color: var(--no-soft); }
+  .role.me { background: var(--ok-soft); border-color: var(--ok-soft); }
+  .motto {
+    margin-top: 34px; text-align: center;
+    font-size: 36px; font-weight: 800; letter-spacing: -.02em;
+  }
+  .motto span { color: var(--blue); }
+
+  /* ---------- 5 demo ---------- */
+  .demo { display: grid; grid-template-columns: 1.25fr .75fr; gap: 36px; flex: 1; min-height: 0; }
+  .dtable { border: 1.5px solid var(--line); border-radius: 18px; overflow: hidden; align-self: start; width: 100%; }
+  .dtable .row { display: grid; grid-template-columns: 44px 1.1fr .9fr 1.3fr 96px; align-items: center; gap: 10px; padding: 9px 16px; font-size: 19px; border-top: 1px solid var(--line); }
+  .dtable .row.h { border-top: 0; background: var(--soft); font-size: 15px; font-weight: 700; color: var(--muted); padding: 10px 16px; }
+  .dtable .row.pick { background: var(--blue-soft); }
+  .dtable .amt { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .dtable .qt { font-size: 16px; color: var(--muted); }
+  .dtable .row .badge { font-size: 14px; padding: 3px 10px; justify-self: start; }
+  .chk { width: 24px; height: 24px; border-radius: 7px; border: 2px solid var(--line); display: grid; place-items: center; }
+  .chk.on { background: var(--blue); border-color: var(--blue); }
+  .dtable .row.total { font-weight: 800; background: #fff; }
+  .askbox {
+    margin-top: 14px; display: flex; justify-content: space-between; align-items: center;
+    background: var(--blue); color: #fff; border-radius: 16px; padding: 16px 22px;
+  }
+  .askbox .l { font-size: 21px; font-weight: 700; }
+  .askbox .v { font-size: 34px; font-weight: 900; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+  .steps { list-style: none; display: grid; gap: 10px; counter-reset: s; align-content: start; }
+  .steps li { counter-increment: s; display: grid; grid-template-columns: 34px 1fr; gap: 12px; align-items: start; font-size: 21px; line-height: 1.35; font-weight: 600; color: var(--sub); }
+  .steps li::before {
+    content: counter(s); width: 34px; height: 34px; border-radius: 50%;
+    display: grid; place-items: center; background: var(--blue-soft); color: var(--blue-d);
+    font-size: 17px; font-weight: 800;
+  }
+  .steps li.hot { color: var(--ink); }
+  .steps li.hot::before { background: var(--blue); color: #fff; }
+  .steps li small { display: block; font-size: 16px; font-weight: 500; color: var(--muted); }
+  .amb { margin-top: 16px; padding: 14px 18px; border-radius: 14px; border: 1.5px dashed var(--warn); background: var(--warn-soft); font-size: 19px; line-height: 1.45; color: #5e3700; }
+  .amb b { color: var(--ink); }
+
+  /* ---------- 6 record book ---------- */
+  .rb { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; flex: 1; align-items: center; }
+  .zone { display: flex; flex-direction: column; gap: 14px; }
+  .zone .zh { display: flex; justify-content: space-between; align-items: center; }
+  .zone .zh b { font-size: 24px; }
+  .pics { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .pic { border-radius: 14px; overflow: hidden; border: 1.5px solid var(--line); }
+  .pic .ph {
+    height: 230px; position: relative;
+    background:
+      linear-gradient(180deg, transparent 62%, rgba(36, 87, 214, .10) 62%),
+      repeating-linear-gradient(90deg, #f1f4fa 0 38px, #e9eef8 38px 40px);
+  }
+  .pic.after .ph {
+    background:
+      linear-gradient(180deg, transparent 62%, rgba(36, 87, 214, .14) 62%),
+      repeating-linear-gradient(90deg, #f1f4fa 0 38px, #e9eef8 38px 40px);
+  }
+  .pic .ph::after {
+    content: ""; position: absolute; left: 22%; top: 24%; width: 30%; height: 26%;
+    border-radius: 6px; background: rgba(255, 255, 255, .85); border: 1.5px solid var(--blue-line);
+  }
+  .pic .cap { padding: 8px 12px; font-size: 16px; font-weight: 700; color: var(--sub); display: flex; justify-content: space-between; }
+  .stamp { display: inline-flex; gap: 8px; align-items: center; padding: 9px 16px; border-radius: 12px; background: var(--ok-soft); color: var(--ok); font-size: 18px; font-weight: 700; align-self: start; }
+  .points { list-style: none; display: grid; gap: 16px; align-content: center; }
+  .points li { display: grid; grid-template-columns: 52px 1fr; gap: 16px; align-items: start; }
+  .points .ic { width: 52px; height: 52px; border-radius: 14px; background: var(--blue-soft); color: var(--blue); display: grid; place-items: center; }
+  .points b { display: block; font-size: 25px; line-height: 1.3; margin-bottom: 3px; }
+  .points span { font-size: 19px; line-height: 1.4; color: var(--muted); }
+
+  /* ---------- 7 money ---------- */
+  .money { grid-template-columns: 1fr 1.25fr .85fr; }
+  .money .card { min-height: 330px; }
+  .price { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 12px 0; border-top: 1px solid var(--blue-line); }
+  .price:first-of-type { border-top: 0; padding-top: 2px; }
+  .price .nm { font-size: 22px; font-weight: 700; line-height: 1.3; }
+  .price .nm small { display: block; font-size: 15px; font-weight: 500; color: var(--muted); margin-top: 2px; }
+  .price .pr { font-size: 26px; font-weight: 900; color: var(--blue); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .price .pr.soon { font-size: 17px; font-weight: 700; color: var(--muted); }
+  .honest { margin-top: 26px; display: flex; gap: 12px; align-items: center; font-size: 20px; font-weight: 600; color: var(--sub); }
+
+  /* ---------- 8 market ---------- */
+  .mk { grid-template-columns: repeat(3, 1fr); }
+  .mk .stat { padding: 24px 26px; }
+  .mk .stat .n { font-size: 56px; }
+  .mk .stat .t { font-size: 19px; }
+  .hyp { margin-top: 22px; display: grid; grid-template-columns: 1fr 64px 1fr; align-items: stretch; flex: 1; }
+  .hyp .card { display: flex; flex-direction: column; justify-content: center; }
+  .hyp .lab { font-size: 17px; font-weight: 800; letter-spacing: .04em; margin-bottom: 8px; }
+  .hyp .q { font-size: 27px; font-weight: 800; line-height: 1.35; letter-spacing: -.01em; }
+  .hyp .ar { display: grid; place-items: center; color: var(--blue); }
+  .note-line { margin-top: 14px; font-size: 17px; color: var(--muted); }
+
+  /* ---------- 9 trust ---------- */
+  .promises { list-style: none; display: grid; gap: 10px; counter-reset: p; flex: 1; align-content: center; }
+  .promises li {
+    counter-increment: p;
+    display: grid; grid-template-columns: 48px 1fr auto; gap: 18px; align-items: center;
+    padding: 10px 22px; border-radius: 16px; background: var(--soft);
+  }
+  .promises li::before {
+    content: counter(p); width: 48px; height: 48px; border-radius: 14px;
+    display: grid; place-items: center; background: var(--blue); color: #fff; font-size: 22px; font-weight: 800;
+  }
+  .promises b { display: block; font-size: 24px; line-height: 1.3; }
+  .promises span { display: block; font-size: 18px; line-height: 1.4; color: var(--muted); margin-top: 2px; }
+  .promises .law { font-size: 15px; font-weight: 700; color: var(--blue-d); background: #fff; border: 1.5px solid var(--blue-line); border-radius: 999px; padding: 5px 14px; white-space: nowrap; }
+
+  /* ---------- 10 competition ---------- */
+  .life { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .stage { text-align: center; font-size: 22px; font-weight: 800; padding: 12px 0; border-radius: 12px; background: var(--soft); color: var(--sub); position: relative; }
+  .stage.focus { background: var(--blue); color: #fff; }
+  .comp { display: grid; gap: 10px; align-content: start; margin-top: 14px; }
+  .comp .c { border: 1.5px solid var(--line); border-radius: 14px; padding: 12px 16px; background: #fff; }
+  .comp .c b { display: block; font-size: 21px; }
+  .comp .c span { font-size: 16px; color: var(--muted); }
+  .comp .c.empty { border-style: dashed; color: var(--muted); text-align: center; display: grid; place-items: center; min-height: 72px; font-size: 18px; font-weight: 600; }
+  .band {
+    margin-top: 16px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
+  }
+  .band .us {
+    grid-column: 2 / span 2;
+    background: var(--blue-soft); border: 2px solid var(--blue); border-radius: 16px;
+    padding: 14px 20px; display: flex; justify-content: space-between; align-items: center; gap: 16px;
+  }
+  .band .us b { font-size: 24px; color: var(--blue-d); white-space: nowrap; }
+  .band .us span { font-size: 18px; font-weight: 600; color: var(--sub); text-align: right; }
+  .band .lbl { display: grid; align-items: center; font-size: 17px; font-weight: 700; color: var(--muted); }
+  .punch { margin-top: 44px; font-size: 30px; font-weight: 800; letter-spacing: -.02em; text-align: center; }
+  .punch span { color: var(--blue); }
+
+  /* ---------- 11 now/next ---------- */
+  .nn { grid-template-columns: 1.15fr 1fr 1fr; flex: 1; }
+  .nn .card h3 { display: flex; align-items: center; gap: 10px; }
+  .nn ul.list li { font-size: 20px; }
+  .nn ul.list { gap: 9px; }
+  .end-url {
+    margin-top: 20px; display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 24px; border-radius: 16px; background: var(--blue); color: #fff;
+  }
+  .end-url b { font-size: 22px; }
+  .end-url a { font-size: 26px; font-weight: 800; text-decoration: none; letter-spacing: -.01em; }
+
+  /* ---------- screen chrome ---------- */
+  .progress { position: fixed; left: 0; bottom: 0; height: 4px; width: 100%; background: rgba(36, 87, 214, .14); z-index: 10; }
+  .progress i { display: block; height: 100%; width: 0; background: var(--blue); transition: width .25s ease; }
+  .controls {
+    position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%);
+    display: flex; gap: 8px; align-items: center; z-index: 11;
+    padding: 6px; border-radius: 999px; background: rgba(255, 255, 255, .92);
+    box-shadow: 0 4px 18px rgba(18, 24, 38, .14);
+    opacity: .35; transition: opacity .2s;
+  }
+  .controls:hover, .controls:focus-within { opacity: 1; }
+  .controls button {
+    width: 44px; height: 44px; border-radius: 50%; border: 0; cursor: pointer;
+    background: var(--blue-soft); color: var(--blue-d); font: inherit; font-size: 22px; font-weight: 800;
+    display: grid; place-items: center;
+  }
+  .controls button:hover { background: var(--blue); color: #fff; }
+  .controls button:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+  .controls .count { min-width: 64px; text-align: center; font-size: 15px; font-weight: 700; color: var(--sub); font-variant-numeric: tabular-nums; }
+  .hint {
+    position: fixed; top: 12px; left: 16px; right: 16px; text-align: center;
+    font-size: 13px; color: var(--muted); display: none; z-index: 11;
+  }
+  @media (orientation: portrait) and (max-width: 760px) {
+    .hint { display: block; }
+    .controls { opacity: 1; }
+  }
+
+  /* ---------- print: one slide per page ---------- */
+  @page { size: 1280px 720px; margin: 0; }
+  @media print {
+    html, body { height: auto; overflow: visible; background: #fff; }
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .deck { position: static; transform: none !important; width: 1280px; height: auto; }
+    .slide {
+      display: flex !important; position: relative; inset: auto;
+      width: 1280px; height: 720px; box-shadow: none; animation: none !important;
+      break-after: page; page-break-after: always; break-inside: avoid;
+    }
+    .slide:last-child { break-after: auto; page-break-after: auto; }
+    .controls, .progress, .hint { display: none !important; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .slide.active { animation: none; }
+  }
+</style>
+</head>
+<body>
+<p class="hint">가로로 돌리면 더 크게 보여요 · 좌우로 밀어 넘기세요</p>
+
+<main class="deck" id="deck" aria-live="polite">
+
+  <!-- 1 표지 -->
+  <section class="slide cover" aria-label="표지">
+    <div class="wrap">
+      <div>
+        <p class="event">국민대 AI 빌더 챌린지 2026 · 주제 '귀찮음 주식회사'</p>
+        <h1>보증금<br><span>지킴이</span></h1>
+        <p class="tag">퇴실 공제 통보,<br>물어볼 근거를 3분 만에</p>
+        <a class="url" href="https://bojeung.193-123-163-215.sslip.io" target="_blank" rel="noopener">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>
+          bojeung.193-123-163-215.sslip.io
+        </a>
+      </div>
+      <div class="mini" aria-hidden="true">
+        <div class="bubble"><span class="who">집주인</span>청소비 15만원, 도배 전체 30만원, 장판 25만원… 총 78만원 공제합니다</div>
+        <svg class="arrow-down" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v15M5 13l7 7 7-7"/></svg>
+        <div class="mtable">
+          <div class="r"><span>청소비</span><b>150,000원</b></div>
+          <div class="r pick"><span>✓ 도배 전체</span><b>300,000원</b></div>
+          <div class="r pick"><span>✓ 장판</span><b>250,000원</b></div>
+          <div class="r"><span>그 외 2개 항목</span><b>80,000원</b></div>
+          <div class="r sum"><span>내가 근거를 물어볼 금액</span><b>550,000원</b></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 WHO -->
+  <section class="slide" aria-label="누구의 어떤 귀찮음">
+    <p class="kicker">WHO · 누구의 어떤 귀찮음</p>
+    <h2>원룸을 빼는 대학생, <em>78만원 공제 카톡</em>을 받다</h2>
+    <div class="body">
+      <div class="who-wrap">
+        <div>
+          <p class="who-line">졸업·휴학·입대·교환학생으로<br><span>원룸을 빼는 대학생</span></p>
+          <div class="chat"><span class="who">집주인 카톡</span>청소비 15만원, 도배 전체 30만원, 장판 25만원… 총 78만원 공제합니다</div>
+        </div>
+        <ol class="chores" aria-label="귀찮음">
+          <li>항목·금액 옮겨 적기</li>
+          <li>관련 자료 찾기</li>
+          <li>무엇부터 물을지 정하기</li>
+          <li>말 꺼내기</li>
+        </ol>
+      </div>
+      <blockquote class="quote">
+        "너무 과하다고 생각했지만 싸우기 싫어서 따지지 않고 그냥 전화를 끊었다."
+        <cite>— 시사저널 인용 사례 · 번거롭고 부담스러워서 결국 그냥 낸다</cite>
+      </blockquote>
+    </div>
+  </section>
+
+  <!-- 3 숫자 -->
+  <section class="slide" aria-label="숫자">
+    <p class="kicker">PROBLEM · 숫자로 보면</p>
+    <h2>대부분 원룸에 살고, 조정은 <em>집주인이 응해야</em> 열린다</h2>
+    <div class="body">
+      <div class="grid stats">
+        <div class="card stat soft">
+          <p class="n">11.2<small>%</small></p>
+          <p class="t">국민대 기숙사 수용률 — 대부분 정릉·길음 원룸에 산다</p>
+          <p class="src">국민대신문, 2017</p>
+        </div>
+        <div class="card stat soft">
+          <p class="n">12.3<small>%</small></p>
+          <p class="t">수도권 원룸 대학생 1,006명 중, 이사 때 보증금 차감 피해를 겪었다고 응답</p>
+          <p class="src">2015 대통령직속 청년위원회 조사 · 시사저널 2016</p>
+        </div>
+        <div class="card stat blue">
+          <div class="pair">
+            <div><p class="n">39.3<small>%</small></p><p class="lab">조정 성립 (처리 3,855건)</p></div>
+            <div><p class="n">81.4<small>%</small></p><p class="lab">세입자 신청 각하 중 임대인 불응</p></div>
+          </div>
+          <p class="t">공공 분쟁조정은 집주인이 응하지 않으면 끝난다</p>
+          <p class="src">이용선 의원 자료, 2026-09-10 보도</p>
+        </div>
+        <div class="card stat soft">
+          <p class="n">5~15<small>만원</small></p>
+          <p class="t">퇴실 청소비 관행 — 도배·장판 교체 요구는 수십만~100만원</p>
+          <p class="src">커뮤니티 사례 15건</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 AI 역할 -->
+  <section class="slide" aria-label="AI가 대신하는 것과 하지 않는 것">
+    <p class="kicker">SOLUTION · AI가 대신하는 것 / 하지 않는 것</p>
+    <h2>AI는 <em>읽고 정리</em>만 한다</h2>
+    <div class="body center-body">
+      <div class="grid g3 roles">
+        <div class="card role ai blue">
+          <p class="who">AI</p>
+          <h3>정리</h3>
+          <ul class="list">
+            <li>메시지에서 항목·청구액·원문 인용을 표로</li>
+            <li>단위가 애매하면 <span class="badge warn">확인 필요</span></li>
+          </ul>
+        </div>
+        <div class="card role me">
+          <p class="who">사용자</p>
+          <h3>확인·선택·발송</h3>
+          <ul class="list">
+            <li>원문과 대조해 확인</li>
+            <li>물어볼 항목을 직접 선택</li>
+            <li>문자는 직접 보낸다</li>
+          </ul>
+        </div>
+        <div class="card role not">
+          <p class="who">AI가 하지 않는 일</p>
+          <h3>결론</h3>
+          <ul class="list no">
+            <li>공제가 맞는지 판단</li>
+            <li>돌려받을 금액 계산</li>
+          </ul>
+        </div>
+      </div>
+      <p class="motto"><span>판단은 사용자가,</span> 정리는 AI가</p>
+    </div>
+  </section>
+
+  <!-- 5 데모 -->
+  <section class="slide" aria-label="데모 흐름">
+    <p class="kicker">DEMO · 3초 장면</p>
+    <h2>붙여 넣고, 확인하고, <em>물어볼 금액</em>이 바로 보인다</h2>
+    <div class="body">
+      <div class="demo">
+        <div>
+          <div class="dtable" aria-hidden="true">
+            <div class="row h"><span>물어볼</span><span>항목</span><span style="text-align:right">청구액</span><span>원문 인용</span><span>상태</span></div>
+            <div class="row"><span class="chk"></span><span>청소비</span><span class="amt">150,000</span><span class="qt">"청소비 15만원"</span><span class="badge gray">확인 전</span></div>
+            <div class="row pick"><span class="chk on"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg></span><span>도배 전체</span><span class="amt">300,000</span><span class="qt">"도배 전체 30만원"</span><span class="badge ok">확인</span></div>
+            <div class="row pick"><span class="chk on"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg></span><span>장판</span><span class="amt">250,000</span><span class="qt">"장판 25만원"</span><span class="badge ok">확인</span></div>
+            <div class="row"><span class="chk"></span><span>싱크대 시트지</span><span class="amt">50,000</span><span class="qt">"싱크대 시트지 5만원"</span><span class="badge gray">확인 전</span></div>
+            <div class="row"><span class="chk"></span><span>샷시 손잡이</span><span class="amt">30,000</span><span class="qt">"샷시 손잡이 3만원"</span><span class="badge gray">확인 전</span></div>
+            <div class="row total"><span></span><span>항목 합계</span><span class="amt">780,000</span><span class="qt">"총 78만원"은 항목이 아님</span><span></span></div>
+          </div>
+          <div class="askbox"><span class="l">내가 근거를 물어볼 금액</span><span class="v">550,000원</span></div>
+        </div>
+        <div>
+          <ol class="steps">
+            <li>공제 메시지 붙여넣기</li>
+            <li><span>5개 항목 · 780,000원 표<small>"총 78만원"은 중복으로 세지 않음</small></span></li>
+            <li>도배·장판 [확인] → 체크</li>
+            <li class="hot">내가 근거를 물어볼 금액 550,000원</li>
+            <li>문의 문자 만들고 [복사]</li>
+          </ol>
+          <p class="amb">모호한 입력 <b>"도배는 30"</b><br>→ 30원? 30만원? 정하지 않고 <span class="badge warn">확인 필요</span></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6 기록북 -->
+  <section class="slide" aria-label="방 상태 기록북">
+    <p class="kicker">RECORD · 방 상태 기록북</p>
+    <h2>입주·퇴실 사진을 <em>구역별로 나란히</em></h2>
+    <div class="body">
+      <div class="rb">
+        <div class="card zone">
+          <div class="zh"><b>구역 · 욕실</b><span class="badge">기록북</span></div>
+          <div class="pics" aria-hidden="true">
+            <div class="pic"><div class="ph"></div><div class="cap"><span>입주</span><span class="muted">메모</span></div></div>
+            <div class="pic after"><div class="ph"></div><div class="cap"><span>퇴실</span><span class="muted">메모</span></div></div>
+          </div>
+          <span class="stamp">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12l5 5L20 6"/></svg>
+            서버 기록 · 날짜 시각 · 지문 8자리
+          </span>
+        </div>
+        <ul class="points">
+          <li>
+            <span class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="12" cy="12" r="3.2"/></svg></span>
+            <div><b>사진은 브라우저 안에서만</b><span>서버로 사진을 보내지 않아요</span></div>
+          </li>
+          <li>
+            <span class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 11V8a5 5 0 0 1 10 0v3"/><rect x="5" y="11" width="14" height="10" rx="2.5"/></svg></span>
+            <div><b>파일 지문(SHA-256)만 서버에 기록</b><span>"이 시각에 이 파일이 있었다"는 기록</span></div>
+          </li>
+          <li>
+            <span class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 14h6M10 17h4"/></svg></span>
+            <div><b>기록북 PDF로 저장</b><span>표지 · 구역별 사진 · 메모 · 서버 기록</span></div>
+          </li>
+          <li>
+            <span class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
+            <div><b>사진 2장까지 무료 체험</b><span>3장부터는 기록북 상품(4,900원) 안내</span></div>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7 MONEY -->
+  <section class="slide" aria-label="수익 모델">
+    <p class="kicker">MONEY · 누가, 얼마를</p>
+    <h2>정리는 <em>영구 무료</em>, 기록과 서식에 값을 매긴다</h2>
+    <div class="body center-body">
+      <div class="grid money">
+        <div class="card soft">
+          <h3>무료 <span class="badge ok">영구</span></h3>
+          <ul class="list">
+            <li>공제 정리</li>
+            <li>참고 자료</li>
+            <li>문의 문자</li>
+            <li>다음 단계 안내</li>
+            <li>기록북 사진 2장 체험</li>
+          </ul>
+        </div>
+        <div class="card blue">
+          <h3>유료 <span class="badge">가설</span></h3>
+          <div class="price"><p class="nm">방 상태 기록북<small>방 1개·이사 1건, 사진 30장·PDF·재다운로드</small></p><p class="pr">4,900원</p></div>
+          <div class="price"><p class="nm">내용증명 빈칸 서식 PDF<small>건당</small></p><p class="pr">2,900원</p></div>
+          <div class="price"><p class="nm">기관용 기록 관리<small>대학 생활관·지자체</small></p><p class="pr soon">출시 예정</p></div>
+        </div>
+        <div class="card role not">
+          <h3>하지 않는 것</h3>
+          <ul class="list no">
+            <li>성공보수</li>
+            <li>변호사 소개비</li>
+            <li>판단·분석 결과 판매</li>
+          </ul>
+        </div>
+      </div>
+      <p class="honest"><span class="badge warn">정직하게</span> 결제는 아직 연결하지 않았어요. 데모에서는 무료로 체험해요.</p>
+    </div>
+  </section>
+
+  <!-- 8 시장 근거 -->
+  <section class="slide" aria-label="시장 근거와 가장 약한 가설">
+    <p class="kicker">MONEY · 시장 근거와 가장 약한 가설</p>
+    <h2>기숙사 밖 대학생의 퇴실은 <em>계약마다 반복</em>된다</h2>
+    <div class="body">
+      <div class="grid mk">
+        <div class="card stat soft">
+          <p class="n">183.8<small>만 명</small></p>
+          <p class="t">일반대학 재적생</p>
+          <p class="src">2025 교육기본통계</p>
+        </div>
+        <div class="card stat soft">
+          <p class="n">22.2<small>%</small></p>
+          <p class="t">전국 기숙사 수용률 · 다수는 기숙사 밖</p>
+          <p class="src">2025 대학정보공시</p>
+        </div>
+        <div class="card stat soft">
+          <p class="n">62.5<small>만원</small></p>
+          <p class="t">서울 대학가 원룸 월세 평균</p>
+          <p class="src">다방, 2026-08</p>
+        </div>
+      </div>
+      <div class="hyp">
+        <div class="card blue">
+          <p class="lab c-blue">가장 약한 가설</p>
+          <p class="q">학생이 방 상태 기록북에<br>4,900원을 낼까?</p>
+        </div>
+        <div class="ar"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h15M13 5l7 7-7 7"/></svg></div>
+        <div class="card solid">
+          <p class="lab">검증 계획</p>
+          <p class="q">현장에서 결과물과 가격을<br>보여 주고 의향을 확인</p>
+        </div>
+      </div>
+      <p class="note-line">연간 퇴실·공제 건수는 가정이 많아 숫자로 추정하지 않고 범위로만 말합니다.</p>
+    </div>
+  </section>
+
+  <!-- 9 신뢰 설계 -->
+  <section class="slide" aria-label="신뢰 설계">
+    <p class="kicker">TRUST · 법과 개인정보</p>
+    <h2>사용자에게 하는 <em>다섯 가지 약속</em></h2>
+    <div class="body">
+      <ol class="promises">
+        <li><div><b>결론을 내리지 않아요</b><span>정리와 출처·범위 태그만 보여 주고, 학생에게 불리한 자료도 함께 보여 줘요</span></div><span class="law">정보 제공 도구</span></li>
+        <li><div><b>돈을 사건 결과에 걸지 않아요</b><span>성공보수·변호사 소개비·판단 결과 판매를 하지 않아요</span></div><span class="law">변호사법 제109조·제34조</span></li>
+        <li><div><b>문자·내용증명은 고정 서식이에요</b><span>사용자가 확인한 항목·금액이 그대로 들어가요 (AI 미사용)</span></div><span class="law">고정 템플릿</span></li>
+        <li><div><b>공제 메시지를 남기지 않아요</b><span>본문은 서버에 저장·로그하지 않고, 전화·계좌 패턴은 가려요</span></div><span class="law">개인정보</span></li>
+        <li><div><b>AI 사용을 먼저 알려요</b><span>첫 화면에 생성형 AI 사용을 고지해요</span></div><span class="law">AI 기본법 제31조</span></li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- 10 경쟁 -->
+  <section class="slide" aria-label="경쟁과 차별점">
+    <p class="kicker">COMPETITION · 경쟁과 차별점</p>
+    <h2>퇴실 공제 단계는 <em>비어 있었다</em></h2>
+    <div class="body center-body">
+      <div class="life">
+        <div>
+          <p class="stage">계약 전</p>
+          <div class="comp">
+            <div class="c"><b>다방·직방</b><span>매물·계약 전</span></div>
+            <div class="c"><b>HUG 안심전세</b><span>전세사기 예방</span></div>
+          </div>
+        </div>
+        <div>
+          <p class="stage">입주</p>
+          <div class="comp">
+            <div class="c"><b>집토스</b><span>입주 체크리스트 · 중개 수수료 모델</span></div>
+          </div>
+        </div>
+        <div>
+          <p class="stage focus">퇴실 공제</p>
+          <div class="comp">
+            <div class="c empty">정리·문의 도구 없음</div>
+          </div>
+        </div>
+        <div>
+          <p class="stage">상담·서식</p>
+          <div class="comp">
+            <div class="c"><b>법률구조공단 챗봇</b><span>일반 법률 정보</span></div>
+            <div class="c"><b>로폼</b><span>법률 서식</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="band">
+        <span class="lbl" style="text-align:right">우리가 맡는 구간</span>
+        <div class="us"><b>보증금 지킴이</b><span>방 상태 기록 → 공제 정리 → 근거 문의</span></div>
+        <span class="lbl" style="text-align:right">무료 기관·공식 링크 안내</span>
+      </div>
+      <p class="punch"><span>퇴실 공제 정리 + 근거 문의 + 방 상태 기록</span>을 한 흐름으로</p>
+    </div>
+  </section>
+
+  <!-- 11 지금 / 다음 -->
+  <section class="slide" aria-label="지금 되는 것과 다음 단계">
+    <p class="kicker">ROADMAP · 지금 되는 것 / 다음 단계</p>
+    <h2>오늘 배포된 것, 다음에 할 것, <em>아직 못 한 것</em></h2>
+    <div class="body">
+      <div class="grid nn">
+        <div class="card blue">
+          <h3><span class="badge ok">구현</span> 지금 되는 것</h3>
+          <ul class="list">
+            <li>공제 메시지 AI 정리</li>
+            <li>확인·선택·합계</li>
+            <li>참고 자료·특약 표시</li>
+            <li>문의 문자·다음 단계</li>
+            <li>방 상태 기록북</li>
+            <li>내용증명 서식</li>
+            <li>가격 안내·처리방침</li>
+          </ul>
+        </div>
+        <div class="card soft">
+          <h3><span class="badge">다음</span> 다음 단계</h3>
+          <ul class="list">
+            <li>공제 사진·계약서 특약 입력과 브라우저 가림</li>
+            <li>결제·계정</li>
+            <li>기관 인터뷰 (대학 생활관·지자체)</li>
+            <li>집주인 확인 링크</li>
+          </ul>
+        </div>
+        <div class="card role not">
+          <h3><span class="badge no">한계</span> 정직하게</h3>
+          <ul class="list no">
+            <li>결제는 아직 연결하지 않음</li>
+            <li>변호사 연결은 공식 링크만</li>
+            <li>통계 일부는 오래됨 (2015·2017 자료)</li>
+          </ul>
+        </div>
+      </div>
+      <div class="end-url">
+        <b>지금 써 보기</b>
+        <a href="https://bojeung.193-123-163-215.sslip.io" target="_blank" rel="noopener">bojeung.193-123-163-215.sslip.io</a>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div class="progress" aria-hidden="true"><i id="bar"></i></div>
+<nav class="controls" aria-label="슬라이드 이동">
+  <button type="button" id="prev" aria-label="이전 슬라이드">‹</button>
+  <span class="count" id="counter">1 / 11</span>
+  <button type="button" id="next" aria-label="다음 슬라이드">›</button>
+</nav>
+
+<script>
+(function () {
+  var deck = document.getElementById('deck');
+  var slides = Array.prototype.slice.call(deck.querySelectorAll('.slide'));
+  var N = slides.length;
+  var bar = document.getElementById('bar');
+  var counter = document.getElementById('counter');
+  var cur = 0;
+
+  // 슬라이드마다 하단 진행 표시 (인쇄에도 남음)
+  slides.forEach(function (s, i) {
+    var f = document.createElement('div');
+    f.className = 'foot';
+    f.innerHTML = '<span>보증금 지킴이</span><span class="num">' + (i + 1) + ' / ' + N + '</span>';
+    s.appendChild(f);
+  });
+
+  function fit() {
+    var s = Math.min(window.innerWidth / 1280, window.innerHeight / 720);
+    deck.style.setProperty('--s', String(s));
+  }
+
+  function fromHash() {
+    var n = parseInt((location.hash || '').replace('#', ''), 10);
+    return n >= 1 && n <= N ? n - 1 : 0;
+  }
+
+  function show(i) {
+    cur = Math.max(0, Math.min(N - 1, i));
+    slides.forEach(function (s, k) {
+      s.classList.toggle('active', k === cur);
+      s.setAttribute('aria-hidden', k === cur ? 'false' : 'true');
+    });
+    counter.textContent = (cur + 1) + ' / ' + N;
+    bar.style.width = ((cur + 1) / N * 100) + '%';
+    try { history.replaceState(null, '', '#' + (cur + 1)); } catch (e) {}
+  }
+  function next() { show(cur + 1); }
+  function prev() { show(cur - 1); }
+
+  document.getElementById('next').addEventListener('click', function (e) { e.stopPropagation(); next(); });
+  document.getElementById('prev').addEventListener('click', function (e) { e.stopPropagation(); prev(); });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    var k = e.key;
+    if (k === 'ArrowRight' || k === 'ArrowDown' || k === 'PageDown' || k === 'Enter' || (k === ' ' && !e.shiftKey)) {
+      e.preventDefault(); next();
+    } else if (k === 'ArrowLeft' || k === 'ArrowUp' || k === 'PageUp' || k === 'Backspace' || (k === ' ' && e.shiftKey)) {
+      e.preventDefault(); prev();
+    } else if (k === 'Home') {
+      e.preventDefault(); show(0);
+    } else if (k === 'End') {
+      e.preventDefault(); show(N - 1);
+    }
+  });
+
+  // 클릭: 화면 왼쪽 30%는 이전, 나머지는 다음 (링크·버튼 제외)
+  var lastSwipe = 0;
+  document.addEventListener('click', function (e) {
+    if (Date.now() - lastSwipe < 500) return;
+    if (e.target.closest && e.target.closest('a, button, .controls')) return;
+    if (e.clientX < window.innerWidth * 0.3) prev(); else next();
+  });
+
+  // 모바일 스와이프
+  var sx = 0, sy = 0, tracking = false;
+  document.addEventListener('touchstart', function (e) {
+    if (e.touches.length !== 1) { tracking = false; return; }
+    tracking = true;
+    sx = e.touches[0].clientX;
+    sy = e.touches[0].clientY;
+  }, { passive: true });
+  document.addEventListener('touchend', function (e) {
+    if (!tracking) return;
+    tracking = false;
+    var t = e.changedTouches[0];
+    var dx = t.clientX - sx, dy = t.clientY - sy;
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+      lastSwipe = Date.now();
+      if (dx < 0) next(); else prev();
+    }
+  }, { passive: true });
+
+  window.addEventListener('resize', fit);
+  window.addEventListener('hashchange', function () { var i = fromHash(); if (i !== cur) show(i); });
+
+  fit();
+  show(fromHash());
+})();
+</script>
+</body>
+</html>

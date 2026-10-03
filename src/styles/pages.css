@@ -1,0 +1,42 @@
+/* 가격 안내·개인정보 처리방침 (FR-07) */
+.page > .muted { margin-top: 0; }
+.page-notes { list-style: none; padding: 0; margin: 16px 0; display: grid; gap: 8px; }
+.page-notes li { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--primary); border-radius: 10px; padding: 10px 14px; font-size: 15px; }
+.page-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0 0; }
+.page-actions .btn { flex: 0 1 auto; }
+
+/* 가격 표 */
+.price-grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
+.price-card h2 { margin: 0 0 10px; font-size: 18px; }
+.price-free h2 { color: var(--accent); }
+.price-paid h2 { color: var(--warn); }
+.price-table { width: 100%; border-collapse: collapse; font-size: 15px; }
+.price-table th, .price-table td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.price-table thead th { font-size: 13px; color: var(--muted); font-weight: 600; }
+.price-table tbody th { font-weight: 700; width: 32%; }
+.price-cell { white-space: nowrap; width: 18%; }
+.price-table tbody tr:last-child th, .price-table tbody tr:last-child td { border-bottom: 0; }
+
+/* 개인정보 처리방침 */
+.policy section { padding: 4px 0 12px; border-bottom: 1px solid var(--line); }
+.policy section:last-of-type { border-bottom: 0; }
+.policy h2 { font-size: 17px; margin: 12px 0 8px; }
+.policy ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+.policy p { margin: 6px 0; }
+.policy a { color: var(--primary); }
+.policy-table-wrap { overflow-x: auto; }
+.policy-table { width: 100%; border-collapse: collapse; font-size: 15px; }
+.policy-table th, .policy-table td { text-align: left; padding: 8px 10px; border: 1px solid var(--line); vertical-align: top; }
+.policy-table th { width: 96px; background: var(--bg); font-weight: 700; white-space: nowrap; }
+.policy-callout { background: var(--warn-bg); color: var(--warn); font-weight: 700; padding: 10px 12px; border-radius: 8px; }
+.policy-date { margin: 12px 0 0; font-weight: 700; }
+
+@media (max-width: 560px) {
+  .price-table thead { display: none; }
+  .price-table, .price-table tbody, .price-table tr, .price-table th, .price-table td { display: block; width: auto; }
+  .price-table tr { padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .price-table tbody tr:last-child { border-bottom: 0; }
+  .price-table th, .price-table td { border: 0; padding: 2px 0; }
+  .price-cell { white-space: normal; }
+  .page-actions .btn { flex: 1 1 100%; }
+}

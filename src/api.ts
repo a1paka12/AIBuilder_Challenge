@@ -71,3 +71,58 @@ export const formatKST = (iso: string) => {
   const p = (x: number) => String(x).padStart(2, '0')
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
 }
+
+// ── DB 연동: 구매 의향(결제 아님)·현장 설문·익명 집계 ─────────────────────────
+export interface Stats {
+  intents: { book: number; cert: number }
+  survey: {
+    total: number
+    deducted: { yes: number; no: number; not_yet: number }
+    asked: { yes: number; no: number }
+    reasons: Partial<Record<SurveyReason, number>>
+  }
+  metrics: { today: Record<string, number>; total: Record<string, number> }
+  prices: { book: number; cert: number }
+}
+export type SurveyReason = 'fight' | 'hassle' | 'unknown_how' | 'small' | 'fear' | 'other'
+export const SURVEY_REASON_LABEL: Record<SurveyReason, string> = {
+  fight: '싸우기 싫어서',
+  hassle: '귀찮아서',
+  unknown_how: '어떻게 물어볼지 몰라서',
+  small: '금액이 작아서',
+  fear: '보증금을 못 받을까 봐',
+  other: '기타',
+}
+
+/** 브라우저마다 하나인 익명 ID (중복 집계 방지용, 개인 식별 정보 아님) */
+export function clientId(): string {
+  const KEY = 'bj_client_id'
+  try {
+    const old = localStorage.getItem(KEY)
+    if (old) return old
+    const id = (crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`).replace(/[^A-Za-z0-9-]/g, '')
+    localStorage.setItem(KEY, id)
+    return id
+  } catch {
+    return `anon-${Math.random().toString(36).slice(2, 12)}`
+  }
+}
+
+export async function getStats(): Promise<Stats> {
+  const r = await fetch('/api/stats')
+  if (!r.ok) throw new ApiFailure('stats', '집계를 불러오지 못했어요.')
+  return r.json()
+}
+
+export function postIntent(product: 'book' | 'cert'): Promise<{ ok: boolean; counted: boolean; stats: Stats }> {
+  return postJson('/api/intent', { clientId: clientId(), product })
+}
+
+export function postSurvey(answer: { deducted: 'yes' | 'no' | 'not_yet'; asked?: 'yes' | 'no' | null; reason?: SurveyReason | null }): Promise<{ ok: boolean; stats: Stats }> {
+  return postJson('/api/survey', { clientId: clientId(), ...answer })
+}
+
+/** 익명 횟수 집계 — 실패해도 화면 동작에 영향 없음 */
+export function postMetric(event: 'copy_message' | 'cert_pdf' | 'book_pdf'): void {
+  fetch('/api/metric', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event }) }).catch(() => {})
+}

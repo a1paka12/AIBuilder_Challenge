@@ -2,6 +2,7 @@
 // - POST /api/extract : 공제 메시지 텍스트 → 항목·청구액·원문 인용 (OpenAI 구조화 출력)
 // - POST /api/receipt : 사진 파일 지문(SHA-256)만 받아 서버 기록 시각을 남김 (사진은 받지 않음)
 // - GET  /api/receipt/:sha256 : 기록 확인
+// - POST /api/intent, /api/survey, /api/metric · GET /api/stats : 구매 의향·현장 설문·익명 집계 (SQLite)
 // - GET  /api/health
 // 원칙: 공제 메시지 본문은 저장·로그하지 않는다. AI는 옮겨 적기만 하고 판단하지 않는다.
 import express from 'express'
@@ -9,6 +10,7 @@ import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { DatabaseSync } from 'node:sqlite'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, '..')
@@ -27,11 +29,52 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY || ''
 const MODEL = process.env.OPENAI_MODEL || 'gpt-5.4-mini'
 const RECEIPT_SECRET = process.env.RECEIPT_SECRET || crypto.randomBytes(32).toString('hex')
 const DATA_DIR = path.join(__dirname, 'data')
-const RECEIPT_LOG = path.join(DATA_DIR, 'receipts.jsonl')
+const DB_PATH = path.join(DATA_DIR, 'bojeung.db')
 const MAX_TEXT = 3000
 const AI_TIMEOUT_MS = 45000
 
 fs.mkdirSync(DATA_DIR, { recursive: true })
+
+// ── DB (SQLite) — 공제 메시지 본문·이름·연락처는 저장하지 않는다 ─────────────
+const db = new DatabaseSync(DB_PATH)
+db.exec(`
+PRAGMA journal_mode = WAL;
+CREATE TABLE IF NOT EXISTS receipts (
+  sha256      TEXT NOT NULL,
+  received_at TEXT NOT NULL,
+  sig         TEXT NOT NULL,
+  PRIMARY KEY (sha256, received_at)
+);
+CREATE TABLE IF NOT EXISTS intents (
+  client_id  TEXT NOT NULL,
+  product    TEXT NOT NULL CHECK (product IN ('book', 'cert')),
+  price      INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (client_id, product)
+);
+CREATE TABLE IF NOT EXISTS survey (
+  client_id  TEXT PRIMARY KEY,
+  deducted   TEXT NOT NULL CHECK (deducted IN ('yes', 'no', 'not_yet')),
+  asked      TEXT CHECK (asked IN ('yes', 'no') OR asked IS NULL),
+  reason     TEXT CHECK (reason IN ('fight', 'hassle', 'unknown_how', 'small', 'fear', 'other') OR reason IS NULL),
+  created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS metrics (
+  day   TEXT NOT NULL,
+  event TEXT NOT NULL,
+  count INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (day, event)
+);
+`)
+const PRICES = { book: 4900, cert: 2900 }
+const METRIC_EVENTS = new Set(['extract_ok', 'copy_message', 'cert_pdf', 'book_pdf', 'receipt'])
+const kstDay = () => new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10)
+const bump = db.prepare(`INSERT INTO metrics (day, event, count) VALUES (?, ?, 1)
+  ON CONFLICT(day, event) DO UPDATE SET count = count + 1`)
+function track(event) {
+  if (METRIC_EVENTS.has(event)) bump.run(kstDay(), event)
+}
+const isClientId = (s) => typeof s === 'string' && /^[A-Za-z0-9-]{8,64}$/.test(s)
 
 const app = express()
 app.disable('x-powered-by')
@@ -190,10 +233,13 @@ app.post('/api/extract', rateLimit, async (req, res) => {
     return res.status(503).json({ error: 'no_ai', message: 'AI 연결이 준비되지 않았어요. 직접 입력으로 계속할 수 있어요.' })
   }
   const started = Date.now()
+  // AI로 보내기 전에 전화·계좌·주민번호·이메일 패턴을 가린다
+  const safeText = maskPII(text)
   try {
-    const raw = await callOpenAI(text)
-    const out = sanitize(raw, text)
+    const raw = await callOpenAI(safeText)
+    const out = sanitize(raw, safeText)
     console.log(`[extract] ok items=${out.items.length} ms=${Date.now() - started}`) // 본문은 로그하지 않음
+    track('extract_ok')
     return res.json({ ...out, source: 'ai' })
   } catch (e) {
     console.log(`[extract] fail ms=${Date.now() - started} err=${String(e?.name || '')}:${String(e?.message || '').slice(0, 80)}`)
@@ -211,33 +257,77 @@ function SAMPLE_RESULT_WITH_IDS() {
 }
 
 // ── 사진 지문 서버 기록 ────────────────────────────────────────────────
+const insReceipt = db.prepare('INSERT OR IGNORE INTO receipts (sha256, received_at, sig) VALUES (?, ?, ?)')
+const selReceipt = db.prepare('SELECT received_at FROM receipts WHERE sha256 = ? ORDER BY received_at')
 app.post('/api/receipt', rateLimit, (req, res) => {
   const sha256 = String(req.body?.sha256 || '').toLowerCase()
   if (!/^[a-f0-9]{64}$/.test(sha256)) return res.status(400).json({ error: 'bad_hash', message: '사진 지문 형식이 올바르지 않아요.' })
   const receivedAt = new Date().toISOString()
   const sig = crypto.createHmac('sha256', RECEIPT_SECRET).update(`${sha256}|${receivedAt}`).digest('hex')
-  fs.appendFileSync(RECEIPT_LOG, JSON.stringify({ sha256, receivedAt, sig }) + '\n')
+  insReceipt.run(sha256, receivedAt, sig)
+  track('receipt')
   return res.json({ sha256, receivedAt, sig })
 })
 
 app.get('/api/receipt/:sha256', (req, res) => {
   const sha256 = String(req.params.sha256 || '').toLowerCase()
-  if (!/^[a-f0-9]{64}$/.test(sha256) || !fs.existsSync(RECEIPT_LOG)) return res.status(404).json({ found: false })
-  const rows = fs
-    .readFileSync(RECEIPT_LOG, 'utf8')
-    .split('\n')
-    .filter(Boolean)
-    .map((l) => {
-      try {
-        return JSON.parse(l)
-      } catch {
-        return null
-      }
-    })
-    .filter((r) => r && r.sha256 === sha256)
+  if (!/^[a-f0-9]{64}$/.test(sha256)) return res.status(404).json({ found: false })
+  const rows = selReceipt.all(sha256)
   if (!rows.length) return res.status(404).json({ found: false })
-  return res.json({ found: true, first: rows[0].receivedAt, count: rows.length })
+  return res.json({ found: true, first: rows[0].received_at, count: rows.length })
 })
+
+// ── 구매 의향(결제 아님) — 같은 브라우저는 상품당 1번만 센다 ─────────────────
+const insIntent = db.prepare('INSERT OR IGNORE INTO intents (client_id, product, price, created_at) VALUES (?, ?, ?, ?)')
+app.post('/api/intent', rateLimit, (req, res) => {
+  const { clientId, product } = req.body || {}
+  if (!isClientId(clientId) || !(product in PRICES)) return res.status(400).json({ error: 'bad_request', message: '요청 형식이 올바르지 않아요.' })
+  const r = insIntent.run(clientId, product, PRICES[product], new Date().toISOString())
+  return res.json({ ok: true, counted: r.changes > 0, stats: getStats() })
+})
+
+// ── 30초 현장 설문 — 선택지만 받는다(자유 입력 없음) ──────────────────────────
+const upSurvey = db.prepare(`INSERT INTO survey (client_id, deducted, asked, reason, created_at) VALUES (?, ?, ?, ?, ?)
+  ON CONFLICT(client_id) DO UPDATE SET deducted = excluded.deducted, asked = excluded.asked, reason = excluded.reason, created_at = excluded.created_at`)
+app.post('/api/survey', rateLimit, (req, res) => {
+  const { clientId, deducted, asked, reason } = req.body || {}
+  const okDeducted = ['yes', 'no', 'not_yet'].includes(deducted)
+  const okAsked = asked == null || ['yes', 'no'].includes(asked)
+  const okReason = reason == null || ['fight', 'hassle', 'unknown_how', 'small', 'fear', 'other'].includes(reason)
+  if (!isClientId(clientId) || !okDeducted || !okAsked || !okReason) return res.status(400).json({ error: 'bad_request', message: '요청 형식이 올바르지 않아요.' })
+  upSurvey.run(clientId, deducted, deducted === 'yes' ? asked ?? null : null, deducted === 'yes' && asked === 'no' ? reason ?? null : null, new Date().toISOString())
+  return res.json({ ok: true, stats: getStats() })
+})
+
+// ── 익명 사용 집계(내용 없이 횟수만) ──────────────────────────────────────────
+app.post('/api/metric', rateLimit, (req, res) => {
+  const event = String(req.body?.event || '')
+  if (!['copy_message', 'cert_pdf', 'book_pdf'].includes(event)) return res.status(400).json({ error: 'bad_event' })
+  track(event)
+  return res.json({ ok: true })
+})
+
+const qIntents = db.prepare('SELECT product, COUNT(*) AS n FROM intents GROUP BY product')
+const qSurveyTotal = db.prepare('SELECT COUNT(*) AS n FROM survey')
+const qSurveyBy = db.prepare('SELECT deducted, asked, reason, COUNT(*) AS n FROM survey GROUP BY deducted, asked, reason')
+const qMetricsTotal = db.prepare('SELECT event, SUM(count) AS n FROM metrics GROUP BY event')
+const qMetricsToday = db.prepare('SELECT event, count AS n FROM metrics WHERE day = ?')
+function getStats() {
+  const intents = { book: 0, cert: 0 }
+  for (const r of qIntents.all()) intents[r.product] = r.n
+  const survey = { total: qSurveyTotal.get().n, deducted: { yes: 0, no: 0, not_yet: 0 }, asked: { yes: 0, no: 0 }, reasons: {} }
+  for (const r of qSurveyBy.all()) {
+    survey.deducted[r.deducted] += r.n
+    if (r.asked) survey.asked[r.asked] += r.n
+    if (r.reason) survey.reasons[r.reason] = (survey.reasons[r.reason] || 0) + r.n
+  }
+  const total = {}
+  for (const r of qMetricsTotal.all()) total[r.event] = r.n
+  const today = {}
+  for (const r of qMetricsToday.all(kstDay())) today[r.event] = r.n
+  return { intents, survey, metrics: { today, total }, prices: PRICES }
+}
+app.get('/api/stats', (_req, res) => res.json(getStats()))
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, ai: Boolean(OPENAI_API_KEY), model: MODEL }))
 

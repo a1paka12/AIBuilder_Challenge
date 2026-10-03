@@ -1,0 +1,115 @@
+/* 방 상태 기록 · 기록북 (FR-05) */
+.record { display: grid; gap: 16px; }
+.record h1 { margin-bottom: 4px; }
+.record h2 { margin: 0 0 10px; }
+.record-notice p { margin: 4px 0; }
+.record-notice .record-trial { margin-top: 8px; }
+
+.record-label { display: block; font-weight: 700; font-size: 14px; margin: 0 0 6px; }
+.record-input {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+}
+.record-input:focus, .record-memo:focus { outline: 2px solid var(--primary); outline-offset: 1px; }
+
+.record-add { display: grid; gap: 14px; }
+.chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+}
+.chip[aria-pressed='true'] { background: var(--primary); border-color: var(--primary); color: var(--primary-ink); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.seg button { min-height: 40px; min-width: 72px; padding: 8px 18px; border: 0; background: var(--surface); color: var(--text); font-weight: 600; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed='true'] { background: var(--text); color: #fff; }
+.record-add-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.record-file { display: none; }
+
+.error-text { color: var(--danger); font-size: 13px; margin: 0; }
+
+.zone-group + .zone-group { margin-top: 18px; }
+.zone-group h3 { margin: 0 0 8px; }
+.photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.photo-card { padding: 0; overflow: hidden; display: flex; flex-direction: column; }
+.photo-card > img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; display: block; background: #eceef1; }
+.photo-body { padding: 12px; display: grid; gap: 8px; }
+.photo-badges { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.photo-file { overflow-wrap: anywhere; }
+.photo-date { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 14px; }
+.record-memo {
+  width: 100%;
+  min-height: 64px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  resize: vertical;
+  background: var(--surface);
+  color: var(--text);
+}
+.photo-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.photo-actions .btn { flex: 1 1 auto; }
+.receipt-badge { white-space: normal; overflow-wrap: anywhere; line-height: 1.4; }
+
+.compare { display: grid; gap: 12px; }
+.compare-head, .compare-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.compare-head { font-weight: 700; font-size: 13px; color: var(--muted); text-align: center; }
+.compare-row h3 { margin: 0 0 6px; font-size: 15px; }
+.compare-cell { border: 1px dashed var(--line); border-radius: 10px; padding: 8px; min-height: 84px; display: flex; align-items: center; }
+.compare-thumbs { display: flex; flex-wrap: wrap; gap: 6px; }
+.compare-thumbs img { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; display: block; }
+.compare-empty { color: var(--warn); font-weight: 700; font-size: 13px; }
+.compare-wait { color: var(--muted); font-size: 13px; }
+
+.book-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.book { background: #fff; color: #1d1f23; border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; margin-top: 12px; }
+.book-cover { text-align: center; padding: 28px 8px; border-bottom: 2px solid #1d1f23; margin-bottom: 8px; }
+.book-room { font-size: 16px; font-weight: 700; color: #5d6470; margin: 0; }
+.book-cover h2 { font-size: 28px; margin: 8px 0; }
+.book-cover p { margin: 4px 0; }
+.book-section h3 { border-left: 4px solid var(--primary); padding-left: 8px; margin: 20px 0 6px; }
+.book-photo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+.book-photo img { width: 100%; max-height: 280px; object-fit: contain; background: #f3f4f6; border-radius: 8px; display: block; }
+.book-meta { margin: 0; display: grid; gap: 4px; font-size: 14px; align-content: start; }
+.book-meta p { margin: 0; overflow-wrap: anywhere; }
+.book-end { margin: 16px 0 0; font-size: 13px; color: #5d6470; border-top: 1px solid var(--line); padding-top: 12px; }
+
+.record-modal h2 { font-size: 18px; margin: 0 0 6px; }
+.record-modal p { margin: 0 0 14px; }
+.record-modal-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.record-modal-actions .btn { flex: 1 1 auto; }
+
+@media (max-width: 560px) {
+  .book { padding: 16px; }
+  .book-photo { grid-template-columns: 1fr; }
+  .photo-grid { grid-template-columns: 1fr; }
+}
+
+@media print {
+  body.print-book * { visibility: hidden; }
+  body.print-book #book-print, body.print-book #book-print * { visibility: visible; }
+  body.print-book #book-print { position: absolute; left: 0; top: 0; width: 100%; margin: 0; border: 0; border-radius: 0; padding: 0; }
+  #book-print { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  #book-print .book-cover { break-after: page; page-break-after: always; padding-top: 30vh; border-bottom: 0; }
+  #book-print .book-photo { break-inside: avoid; page-break-inside: avoid; }
+  #book-print .book-photo img { max-height: 9cm; }
+  #book-print .book-section h3 { break-after: avoid; page-break-after: avoid; }
+}
