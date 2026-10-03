@@ -1,113 +1,334 @@
 # 보증금 지킴이 데이터 모델 (ERD)
 
-작성일: 2026-10-03 · 관련 문서: [PRD](PRD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [API](API.md) · [PRIVACY_LEGAL](PRIVACY_LEGAL.md)
+작성일: 2026-10-03 · 기준 코드: `server/server.mjs`, `src/types.ts`, `src/data/lawyers.ts`, `src/lib/promo.ts`, `src/api.ts`
+관련 문서: [PRD](PRD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [API](API.md) · [PRIVACY_LEGAL](PRIVACY_LEGAL.md) · [REFERENCES](REFERENCES.md)
 
-이 문서는 **현재(MVP, 해커톤 배포본)** 와 **향후(창업 목표)** 를 나눠 적는다. 현재 구현에 없는 것은 "향후"에만 쓴다.
+이 문서는 **현재(해커톤 배포본)** 데이터와 **향후(창업 목표)** 데이터를 나눠 적는다. 현재 구현에 없는 것은 7장 "향후"에만 쓴다.
 
 ---
 
-## 1. 현재(MVP) 데이터 모델
-
-### 1-1. 저장 위치 요약
+## 1. 한눈에 보기 — 무엇이 어디에 있나
 
 | 데이터 | 어디에 있나 | 얼마나 남나 | 코드 |
 |---|---|---|---|
-| Receipt (사진 지문 기록) | **서버 파일** `server/data/receipts.jsonl` (한 줄에 JSON 하나, 추가 전용) | 서버 파일에 계속 남음 | `server/server.mjs` `POST /api/receipt` |
-| DeductionState, Item | 브라우저 메모리 (React 상태) | 새로고침·탭 닫기 시 사라짐 | `src/state.tsx`, `src/types.ts` |
-| RoomPhoto (사진 자체) | 브라우저 메모리 (object URL) | 새로고침·탭 닫기 시 사라짐 | `src/types.ts` `RoomPhoto` |
-| ReferenceDoc (참고 자료 5개) | 프론트엔드 코드에 들어 있는 정적 데이터 | 배포본과 함께 | 화면 코드의 정적 목록 |
+| 사진 지문 기록 `receipts` | 서버 SQLite `server/data/bojeung.db` | 2026-12-31 일괄 삭제 | `POST /api/receipt` |
+| 구매 의향 `intents` (결제 아님) | 서버 SQLite | 2026-12-31 일괄 삭제 | `POST /api/intent` |
+| 30초 현장 설문 `survey` | 서버 SQLite | 2026-12-31 일괄 삭제 | `POST /api/survey` |
+| 익명 사용 횟수 `metrics` | 서버 SQLite | 2026-12-31 일괄 삭제 | `POST /api/metric` + 서버 내부 집계 |
+| 무작위 기기 ID·팝업·혜택 표시 | 브라우저 저장소(localStorage·sessionStorage) | 사용자가 지울 때까지 / 탭 닫을 때까지 | `src/api.ts`, `src/lib/promo.ts`, `src/screens/Pricing.tsx` |
+| 공제 정리 상태(원문·처리본·항목) | 브라우저 메모리(React 상태) | 새로고침·탭 닫기 시 사라짐 | `src/state.tsx`, `src/types.ts` |
+| 방 사진(가림 처리본) | 브라우저 메모리(object URL) | 새로고침·탭 닫기 시 사라짐 | `src/types.ts` `RoomPhoto` |
+| 가상 프로필(변호사 데모 데이터) | 프론트엔드 정적 데이터 | 배포본과 함께 | `src/data/lawyers.ts` |
+| 참고 자료 5종 | 프론트엔드 정적 데이터 | 배포본과 함께 | `src/data/references.ts` |
+| 무료 상담 기관 5곳 | 프론트엔드 정적 데이터 | 배포본과 함께 | `src/data/agencies.ts` |
 
-- **공제 메시지 본문은 서버에 저장하지 않는다.** `POST /api/extract`는 본문을 받아 AI에 넘기고 결과만 돌려준다. 서버 로그에는 항목 수와 처리 시간만 남긴다.
-- **사진 파일은 서버로 보내지 않는다.** 브라우저에서 SHA-256 지문을 계산해 지문(64자 16진수)만 보낸다.
-- 회원·로그인·DB가 없다. 서버에 남는 것은 Receipt 한 종류뿐이다.
+- 회원·로그인이 없다. 서버 DB에는 4개 테이블만 있고, **이름·연락처·공제 문자 본문·사진은 어느 테이블에도 없다.**
+- 서버 DB는 Node 내장 `node:sqlite`(`DatabaseSync`)를 쓰고 WAL 모드로 연다.
 
-### 1-2. ER 다이어그램 (현재)
+---
+
+## 2. 서버 DB (SQLite) — 실제 DDL
+
+`server/server.mjs`가 시작할 때 실행하는 문장 그대로다.
+
+```sql
+PRAGMA journal_mode = WAL;
+CREATE TABLE IF NOT EXISTS receipts (
+  sha256      TEXT NOT NULL,
+  received_at TEXT NOT NULL,
+  sig         TEXT NOT NULL,
+  PRIMARY KEY (sha256, received_at)
+);
+CREATE TABLE IF NOT EXISTS intents (
+  client_id  TEXT NOT NULL,
+  product    TEXT NOT NULL CHECK (product IN ('book', 'cert')),
+  price      INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (client_id, product)
+);
+CREATE TABLE IF NOT EXISTS survey (
+  client_id  TEXT PRIMARY KEY,
+  deducted   TEXT NOT NULL CHECK (deducted IN ('yes', 'no', 'not_yet')),
+  asked      TEXT CHECK (asked IN ('yes', 'no') OR asked IS NULL),
+  reason     TEXT CHECK (reason IN ('fight', 'hassle', 'unknown_how', 'small', 'fear', 'other') OR reason IS NULL),
+  created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS metrics (
+  day   TEXT NOT NULL,
+  event TEXT NOT NULL,
+  count INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (day, event)
+);
+```
+
+### 2-1. 서버 DB 다이어그램
+
+```mermaid
+erDiagram
+    CLIENT ||--o{ INTENTS : "익명 ID (상품별 1건)"
+    CLIENT ||--o| SURVEY : "익명 ID (1건, 다시 내면 덮어씀)"
+    RECEIPTS {
+        TEXT sha256 PK "가림 처리본 사진의 SHA-256 (64자 16진수)"
+        TEXT received_at PK "서버 수신 시각 ISO 8601 UTC"
+        TEXT sig "HMAC-SHA256(sha256|received_at)"
+    }
+    INTENTS {
+        TEXT client_id PK "무작위 기기 ID"
+        TEXT product PK "book | cert"
+        INTEGER price "4900 | 2900 (가격 가설)"
+        TEXT created_at "ISO 8601 UTC"
+    }
+    SURVEY {
+        TEXT client_id PK "무작위 기기 ID"
+        TEXT deducted "yes | no | not_yet"
+        TEXT asked "yes | no | NULL"
+        TEXT reason "fight | hassle | unknown_how | small | fear | other | NULL"
+        TEXT created_at "ISO 8601 UTC"
+    }
+    METRICS {
+        TEXT day PK "한국 시각 날짜 YYYY-MM-DD"
+        TEXT event PK "이벤트 이름"
+        INTEGER count "횟수"
+    }
+    CLIENT {
+        TEXT client_id "테이블 아님 - 브라우저 bj_client_id 값"
+    }
+```
+
+`receipts`·`metrics`는 다른 테이블과 연결되지 않는다(기기 ID도 받지 않는다).
+
+### 2-2. 컬럼 설명
+
+**`receipts` — 사진 지문 기록 (추가만, 덮어쓰기·수정 없음)**
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| `sha256` | TEXT | 브라우저가 **가림 처리본**(canvas로 다시 만든 새 파일)에서 계산한 SHA-256. 소문자 16진수 64자 |
+| `received_at` | TEXT | 서버가 요청을 받은 시각(ISO 8601, UTC). 촬영 시각이 아니다 |
+| `sig` | TEXT | `HMAC-SHA256(key=RECEIPT_SECRET, "{sha256}\|{received_at}")` 16진수 |
+| PK | | `(sha256, received_at)` — 같은 지문을 다시 보내면 행이 하나 더 생긴다 |
+
+**`intents` — 구매 의향 (결제 아님)**
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| `client_id` | TEXT | 무작위 기기 ID(`^[A-Za-z0-9-]{8,64}$`) |
+| `product` | TEXT | `book`(기록북) · `cert`(내용증명 서식) |
+| `price` | INTEGER | 서버가 붙이는 가격 가설: book 4,900원 · cert 2,900원 |
+| `created_at` | TEXT | 기록 시각(ISO 8601, UTC) |
+| PK | | `(client_id, product)` — `INSERT OR IGNORE`라 기기·상품당 1건만 센다 |
+
+**`survey` — 30초 현장 설문 (보기 선택만, 자유 입력 없음)**
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| `client_id` | TEXT PK | 무작위 기기 ID. 다시 내면 같은 행을 덮어쓴다 |
+| `deducted` | TEXT | 보증금에서 떼인 적이 있는지: `yes` · `no` · `not_yet` |
+| `asked` | TEXT/NULL | 근거를 물어봤는지. `deducted=yes`일 때만 저장, 아니면 NULL |
+| `reason` | TEXT/NULL | 안 물어본 이유. `asked=no`일 때만 저장. `fight` 싸우기 싫어서 · `hassle` 귀찮아서 · `unknown_how` 어떻게 물어볼지 몰라서 · `small` 금액이 작아서 · `fear` 보증금을 못 받을까 봐 · `other` 기타 |
+| `created_at` | TEXT | 마지막 응답 시각(ISO 8601, UTC) |
+
+**`metrics` — 익명 사용 횟수 (내용 없음)**
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| `day` | TEXT | 한국 시각 날짜(`YYYY-MM-DD`) |
+| `event` | TEXT | 아래 8가지 중 하나 |
+| `count` | INTEGER | 그날 그 이벤트 횟수. 행은 `(day, event)`마다 하나이고 `count`만 올린다 |
+
+| `event` | 누가 올리나 | 언제 |
+|---|---|---|
+| `extract_ok` | 서버 내부 | AI 정리 성공 |
+| `receipt` | 서버 내부 | 사진 지문 기록 성공 |
+| `copy_message` | 브라우저 → `POST /api/metric` | 문의 문자 복사 |
+| `cert_pdf` | 브라우저 → `POST /api/metric` | 내용증명 서식 PDF 받기 |
+| `book_pdf` | 브라우저 → `POST /api/metric` | 기록북 인쇄/PDF 저장 |
+| `popup_event` | 브라우저 → `POST /api/metric` | 첫 화면 팝업에서 이벤트 자세히 보기 |
+| `popup_help` | 브라우저 → `POST /api/metric` | 첫 화면 팝업에서 상담 기관 자세히 보기 |
+| `lawyer_search` | 브라우저 → `POST /api/metric` | 변호사 찾아보기 조건 검색 |
+
+---
+
+## 3. 브라우저 저장소 키
+
+쿠키는 쓰지 않는다. 아래 값만 이 기기 브라우저에 두며, 서버로 자동 전송되지 않는다(`bj_client_id`만 설문·구매 의향을 보낼 때 요청 본문에 실린다). 저장소가 막힌 환경(사생활 모드 등)에서는 메모리 값으로만 동작한다.
+
+| 이름 | 위치 | 값 | 용도 | 지우는 법 |
+|---|---|---|---|---|
+| `bj_client_id` | localStorage | 무작위 문자열(`crypto.randomUUID()` 기반, 영문·숫자·하이픈) | 설문·구매 의향을 같은 기기에서 두 번 세지 않기 | 브라우저 설정 → 사이트 데이터 삭제. 처리방침 화면(#/privacy)에서 값 확인·복사 가능 |
+| `bj_popup_hide_until` | localStorage | 다음 한국 시각 자정의 시각 값(밀리초 숫자 문자열) | 첫 화면 팝업 "오늘 하루 보지 않기" | 자정이 지나면 무시됨 / 사이트 데이터 삭제 |
+| `bj_promo_unlocked` | localStorage | `'1'` | 출시 이벤트 설문 응답 후 이 기기에서 기록북 3장째 안내 해제 | 사이트 데이터 삭제 |
+| `bj_intent_book` · `bj_intent_cert` | localStorage | `'1'` | 가격 안내에서 구매 의향 버튼을 이미 눌렀다는 표시 | 사이트 데이터 삭제 |
+| `bj_popup_closed` | sessionStorage | `'1'` | 이번 탭에서 첫 화면 팝업을 닫았는지 | 탭을 닫으면 사라짐 |
+
+---
+
+## 4. 저장하지 않는 데이터
+
+| 데이터 | 어떻게 다루나 |
+|---|---|
+| 공제 문자 원문 | 브라우저 메모리에만 있다. 서버로 보내지 않는다 |
+| 공제 문자 처리본(가린 글) | `/api/extract` 요청으로 받아 OpenAI에 넘기고 결과만 돌려준다. DB·로그에 남기지 않는다 |
+| 치환 대응표(무엇을 무엇으로 바꿨는지) | 브라우저에만 있다. 서버로 보내지 않는다 |
+| 사진 파일(원본·처리본) | 서버로 보내지 않는다. 사진 업로드 API가 없다. 지문(SHA-256)만 보낸다 |
+| 사진 원본 파일명·EXIF·GPS | 파일명은 서버로 보내지 않는다. 처리본은 canvas 재인코딩으로 메타데이터가 빠진 새 파일이다 |
+| 이름·주소·호수(문자·내용증명 입력값) | 브라우저 안에서 서식을 채우는 데만 쓴다 |
+| 변호사 찾아보기 조건 | 브라우저 안에서 점수를 계산한다. 서버에는 `lawyer_search` 횟수만 간다 |
+| IP 주소 | 요청 속도 제한(분당 30회)을 위해 서버 메모리에 1분간만 둔다. DB·파일에 쓰지 않는다 |
+| 서버 로그 | `[extract] ok items=5 ms=2310`처럼 건수·소요 시간만. 본문은 쓰지 않는다 |
+
+---
+
+## 5. 보유 기간
+
+| 대상 | 기간 | 파기 |
+|---|---|---|
+| 서버 DB 4개 테이블 | **2026-12-31까지** | 그날 DB 파일을 일괄 삭제. 요청하면 즉시 삭제(기기 ID 기준) |
+| 브라우저 저장소 | 사용자가 지울 때까지(`bj_popup_closed`는 탭을 닫을 때까지) | 사용자가 브라우저에서 삭제 |
+| 브라우저 메모리(공제 정리·사진) | 새로고침·탭 닫기까지 | 자동 |
+
+자세한 내용은 [PRIVACY_LEGAL.md](PRIVACY_LEGAL.md)와 화면 #/privacy를 따른다.
+
+---
+
+## 6. 클라이언트 상태 모델 (브라우저 메모리)
+
+### 6-1. 다이어그램
 
 ```mermaid
 erDiagram
     DEDUCTION_STATE ||--o{ ITEM : "items"
-    ITEM }o--o{ REFERENCE_DOC : "키워드로 화면에서 매칭(저장 안 함)"
-    ROOM_PHOTO }o--o| RECEIPT : "sha256로 연결"
+    ITEM }o--o{ REFERENCE : "키워드로 화면에서 연결 (저장 안 함)"
+    ROOM_PHOTO }o--o| RECEIPT_RESPONSE : "receipt (sha256로 서버 receipts와 연결)"
+    LAWYER_CRITERIA ||--o{ LAWYER_PROFILE : "조건 일치 점수로 최대 3명"
 
     DEDUCTION_STATE {
-        string rawText "붙여 넣은 공제 메시지 (브라우저 메모리만)"
-        int statedTotal "메시지에 적힌 총액, 없으면 null"
+        string rawText "붙여 넣은 원문 - 이 기기에서만"
+        string processedText "서버로 보낸 처리본, 직접 입력이면 없음"
+        string maskSummary "가린 항목 요약 예 전화번호 1"
+        int statedTotal "문자에 적힌 총액, 없으면 null"
         string source "ai | cache | manual | null"
         string contractor "self | other | unknown"
-        string clauseText "특약 문구 (선택, 브라우저만)"
-        string myName "문자·내용증명용 (브라우저만)"
-        string place "문자·내용증명용 (브라우저만)"
+        string clauseText "붙여 넣은 특약 문구 (선택)"
+        string myName "문자 서식용 (브라우저만)"
+        string place "문자 서식용 (브라우저만)"
     }
     ITEM {
         string id PK "item-1 ... 또는 직접 추가 행 id"
         string name "항목명"
         int amount "원 단위 정수, 모르면 null"
         string quote "원문 인용, 직접 추가 행은 빈 문자열"
-        boolean quoteFound "원문에서 인용을 찾았는지"
+        boolean quoteFound "인용이 처리본에 있는지"
         boolean needsCheck "확인 필요 표시"
         string checkReason "단위 불명확 | 금액 없음 | 원문 확인 필요 | 금액 범위 확인 필요"
-        boolean confirmed "사용자가 [확인]을 눌렀는지"
-        boolean selected "물어볼 항목 체크 (confirmed일 때만)"
-        boolean manual "사용자가 직접 추가한 행"
+        boolean confirmed "사용자가 확인을 눌렀는지"
+        boolean selected "물어볼 항목 체크"
+        boolean manual "직접 추가한 행"
     }
     ROOM_PHOTO {
         string id PK
         string zone "벽 | 바닥 | 욕실 | 주방 | 창문/문 | 옵션 가전 | 기타"
         string phase "입주 | 퇴실"
-        string url "브라우저 object URL (서버로 안 보냄)"
-        string fileName
-        string sha256 FK "브라우저에서 계산한 파일 지문"
+        string url "처리본 object URL (서버로 안 보냄)"
+        string fileName "원본 파일명 - 화면 표시만, 서버로 안 보냄"
+        string sha256 "처리본 지문"
         string memo
         string date "날짜, 없으면 null"
         string dateSource "exif | manual | none"
+        boolean masked "가림 처리본인지"
+        int maskCount "가림 상자 수"
     }
-    RECEIPT {
-        string sha256 PK "64자 16진수 (같은 지문 여러 줄 가능)"
-        string receivedAt "서버 수신 시각 ISO 8601 (UTC)"
-        string sig "HMAC-SHA256(sha256|receivedAt)"
+    RECEIPT_RESPONSE {
+        string sha256
+        string receivedAt "서버 수신 시각"
+        string sig "HMAC 서명"
     }
-    REFERENCE_DOC {
+    REFERENCE {
         string id PK "std-contract-9 등 5개"
         string title
         string quote "원문 인용 또는 판결 요지"
-        string scope "범위 태그"
-        string url "출처 링크"
-        string checkedAt "확인일 2026-10-03"
-        string keywords "표시 키워드, 비어 있으면 모든 항목 공통"
+        string scope "범위 태그, 불리한 자료도 표시"
+        string url "출처"
+        string checkedAt "확인일"
+    }
+    LAWYER_CRITERIA {
+        string topics "상담 주제 4종 중 1개 이상"
+        string method "전화 | 영상 | 방문 + 꼭 필요/선호/상관없음"
+        string region "방문일 때만 + 등급"
+        string budget "30분 상담 기준 상한 + 등급"
+        string timing "희망 시점 + 등급"
+        string language "언어 + 등급 (꼭 필요일 때만 거름)"
+    }
+    LAWYER_PROFILE {
+        string id PK "정렬 마지막 기준"
+        string name "가상 변호사 A 등 - 실존 인물 아님"
+        string handledTopics "확인된 취급 업무 (등록 전문분야와 구분)"
+        string registeredSpecialty "등록 전문분야 - 가상 프로필은 없음"
+        string methods "제공 상담 방식"
+        string regions "방문 가능 지역"
+        int fee30 "30분 상담료, 미확인이면 요금 문의 필요"
+        int earliestDays "가장 빠른 상담 가능 시점, 미확인 가능"
+        string languages "상담 언어"
+        string checkedAt "정보 확인일 - 동점 시 최근 순"
     }
 ```
 
-### 1-3. 규칙 (코드가 지키는 것)
+### 6-2. 공제 정리 규칙 (코드가 지키는 것)
 
 | 규칙 | 위치 |
 |---|---|
+| 원문을 고치면 "전송본 확인"이 풀리고, 다시 확인해야 전송된다 | `src/screens/Deduct.tsx` |
+| `/api/extract`에는 `maskText()`를 거친 처리본(`ProcessedText` 타입)만 넘길 수 있다 | `src/lib/mask.ts`, `src/api.ts` `extractItems` |
 | 이름·금액을 고치면 `confirmed`·`selected`가 `false`로 돌아간다 | `src/state.tsx` `updateItem` |
 | `confirmed`가 아니면 `selected`는 항상 `false` | `src/state.tsx` `updateItem` |
-| "내가 근거를 물어볼 금액" = `selected && confirmed && amount가 숫자`인 행의 `amount` 합 | `src/state.tsx` `useSelection().askTotal` |
-| 개별 합계 = 금액이 숫자인 모든 행의 합. `statedTotal`(메시지 속 총액)은 항목이 아니며 합계에 더하지 않는다 | `useSelection().itemSum` |
-| 서버는 원문에 없는 인용을 `quoteFound=false`, `needsCheck=true`로 바꾼다 | `server/server.mjs` `sanitize` |
-| Receipt는 덮어쓰지 않고 줄을 추가만 한다. 조회는 같은 지문의 첫 기록 시각과 횟수를 돌려준다 | `POST/GET /api/receipt` |
-| `RoomPhoto.receipt`는 서버가 돌려준 Receipt를 그대로 담는다(없으면 `null`) | `src/types.ts` |
+| "내가 근거를 물어볼 금액" = 확인·체크한 행 `amount` 합 | `src/state.tsx` `useSelection().askTotal` |
+| 개별 합계 = 금액이 숫자인 모든 행의 합. `statedTotal`은 항목이 아니며 더하지 않는다 | `useSelection().itemSum` |
+| 원문에 없는 인용은 서버가 `quoteFound=false`, `needsCheck=true`로 바꾼다 | `server/server.mjs` `sanitize` |
 
-### 1-4. 참고 자료 5개 (정적 데이터)
+예시(합성 문자, `#/deduct?sample=1`): 공제 합계 780,000원 중 도배 300,000원 + 장판 250,000원을 체크하면 물어볼 금액은 550,000원이다.
 
-| id | 범위 태그 | 표시 조건 |
-|---|---|---|
-| `std-contract-9` | 표준계약서 사용 시 | 키워드: 도배, 벽지, 장판, 바닥, 노후, 파손, 원상복구, 원상회복, 청소, 시트지, 싱크대 |
-| `sc-2005da8323` | 대법원 판결 | 모든 항목 공통 |
-| `sc-91da22605` | 대법원 판결 · 세입자에게 불리할 수 있음 | 모든 항목 공통 |
-| `sc-2002da52657` | 대법원 판결 | 키워드: 도배, 벽지, 장판, 바닥, 원상복구, 원상회복, 청소, 시트지, 싱크대, 수리 |
-| `hldcc` | 공공 절차 안내 | 모든 항목 공통 |
+### 6-3. 방 사진 규칙
 
-전체 내용과 출처는 [REFERENCES.md](REFERENCES.md).
+| 규칙 | 위치 |
+|---|---|
+| JPEG·PNG만 받는다. 그 외 형식은 막고 안내한다 | `src/screens/Record.tsx` |
+| 가림 상자를 그린 뒤 canvas로 새 파일을 만든다. `url`·`sha256`은 처리본 기준이다 | `src/lib/imageMask.ts` |
+| 날짜는 원본 EXIF에서 읽거나(`dateSource=exif`) 직접 입력한다(`manual`). 화면에 출처를 표시한다 | `src/lib/exif.ts` |
+| 서버로는 `sha256`만 간다. `receipt`는 서버 응답을 그대로 담는다(실패하면 `null`) | `src/api.ts` `createReceipt` |
+| 서버 기록은 "이 지문을 이 시각에 받았다"는 뜻이며 촬영 시점 증명이 아니다 | 화면 문구 |
+
+### 6-4. 변호사 조건 추천 모델 (가상 프로필)
+
+- 프로필은 전부 **데모용 가상 프로필**이다. 실존 변호사가 아니고, 연락처·예약·후기·승소 실적이 없다. 카드에 "가상 프로필" 배지를 붙인다.
+- 조건마다 등급이 있다: **꼭 필요**(충족 안 하거나 확인 안 되면 후보에서 제외) / **선호**(점수에 반영) / **상관없음**(점수에서 제외).
+
+| 기준 | 가중치 | 일치값 |
+|---|---:|---|
+| 상담 주제 | 40 | 확인된 취급 주제 수 ÷ 선택한 주제 수 |
+| 상담 방식 | 20 | 지원 1, 불일치·미확인 0 |
+| 방문 지역 | 15 | 범위 안 1, 그 외·미확인 0 (전화·영상만이면 기준에서 뺌) |
+| 예산(30분 기준) | 15 | 이내 1, 초과·미확인 0 |
+| 희망 시점 | 10 | 충족 1, 불일치·미확인 0 |
+
+조건 일치 점수 = 100 × Σ(활성 기준 가중치 × 일치값) ÷ Σ(활성 기준 가중치). 언어는 점수에 넣지 않고 꼭 필요일 때만 거른다. 동점은 확인일 최근 순 → ID 순. 검산 예시는 [PRD](PRD.md)의 FR-03(가상 A 100 / B 75 / C 65).
+
+### 6-5. 참고 자료 5종 (정적 데이터)
+
+| id | 범위 태그 |
+|---|---|
+| `std-contract-9` | 표준계약서 사용 시 (공공누리 제4유형 표시) |
+| `sc-2005da8323` | 대법원 판결 |
+| `sc-91da22605` | 대법원 판결 · 세입자에게 불리할 수 있음 |
+| `sc-2002da52657` | 대법원 판결 |
+| `hldcc` | 공공 절차 안내 |
+
+전체 내용·출처·확인일은 [REFERENCES.md](REFERENCES.md).
 
 ---
 
-## 2. 향후(창업 목표) 데이터 모델
+## 7. 향후(창업 목표) 데이터 모델 — 아직 구현하지 않음
 
-로그인, 이사 건 단위 보관, 기록북 재다운로드, 결제를 붙일 때의 모델이다. **아직 구현하지 않았다.**
-
-### 2-1. ER 다이어그램 (향후)
+로그인·이사 건 단위 보관·기록북 재다운로드·결제를 붙일 때의 초안이다.
 
 ```mermaid
 erDiagram
@@ -116,110 +337,17 @@ erDiagram
     MOVE ||--o{ DEDUCTION_ITEM : "공제 항목"
     MOVE ||--o{ PHOTO : "방 사진"
     MOVE ||--o| BOOK : "기록북"
-    MOVE ||--o{ INQUIRY : "문의 기록"
     PHOTO ||--o{ RECEIPT : "지문 기록"
-    BOOK }o--o{ PHOTO : "포함 사진"
     ORDER }o--o| BOOK : "기록북 구매"
-    INQUIRY }o--o{ DEDUCTION_ITEM : "물어본 항목"
-    DEDUCTION_ITEM }o--o{ REFERENCE_DOC : "보여 준 자료"
-
-    USER {
-        uuid id PK
-        string auth_provider "소셜 로그인 제공사"
-        string auth_subject "제공사 사용자 식별자"
-        string email "재다운로드·영수증용, 선택"
-        datetime created_at
-        datetime deleted_at "탈퇴 시 파기 예약"
-    }
-    MOVE {
-        uuid id PK
-        uuid user_id FK
-        string room_nickname "방 별칭 예: 정릉 원룸 (상세 주소 아님)"
-        date move_in_date
-        date move_out_date
-        string status "기록중 | 퇴실통보받음 | 문의함 | 정리끝"
-        string contractor "self | other | unknown"
-        datetime created_at
-    }
-    DEDUCTION_ITEM {
-        uuid id PK
-        uuid move_id FK
-        string name
-        int amount "원 단위, null 가능"
-        string quote "원문 인용 (본문 전체는 저장 안 함)"
-        boolean needs_check
-        string check_reason
-        boolean confirmed
-        boolean selected
-        string source "ai | manual"
-    }
-    PHOTO {
-        uuid id PK
-        uuid move_id FK
-        string zone
-        string phase "입주 | 퇴실"
-        string storage_key "위치정보 제거한 이미지, 유료 보관 시에만"
-        string sha256 "원본 파일 지문"
-        string memo
-        date taken_date
-        string date_source "exif | manual | none"
-    }
-    RECEIPT {
-        uuid id PK
-        string sha256 "지문"
-        datetime received_at
-        string sig "HMAC 서명"
-        string key_id "서명 키 버전"
-    }
-    BOOK {
-        uuid id PK
-        uuid move_id FK
-        int photo_limit "30"
-        string pdf_key "생성된 PDF 위치"
-        int download_count
-        datetime generated_at
-    }
-    ORDER {
-        uuid id PK
-        uuid user_id FK
-        string product "record_book | cert_template | org_plan"
-        int price "4900 | 2900 (가설)"
-        string pg_payment_id "PG사 결제 번호 (카드 정보 저장 안 함)"
-        string status "ready | paid | refunded | canceled"
-        datetime paid_at
-    }
-    INQUIRY {
-        uuid id PK
-        uuid move_id FK
-        string kind "문의 문자 | 내용증명 서식"
-        json item_ids "포함한 항목"
-        int ask_total "물어본 금액 합"
-        date sent_date "사용자가 직접 보낸 날짜 (자동 발송 없음)"
-        string memo
-    }
-    REFERENCE_DOC {
-        string id PK
-        string title
-        string quote
-        string scope
-        string url
-        date checked_at
-        json keywords
-        int version "자료 개정 이력"
-    }
 ```
 
-### 2-2. 최소 수집 원칙 (향후 모델에도 적용)
+| 엔터티 | 주요 필드 | 최소 수집 원칙 |
+|---|---|---|
+| USER | 소셜 로그인 식별자, 선택 이메일 | 주민등록번호·전화번호 받지 않음 |
+| MOVE | 방 별칭, 입주·퇴실일, 진행 상태 | 상세 주소(동·호수) 대신 별칭 |
+| DEDUCTION_ITEM | 항목명·금액·짧은 인용·확인 여부 | 문자 본문 전체는 저장 안 함 |
+| PHOTO | 구역·입주/퇴실·지문·메모 | 유료 보관을 고른 사용자만, 가림·메타데이터 제거본만 |
+| RECEIPT | 지문·수신 시각·서명·키 버전 | 사진 자체와 분리 |
+| ORDER | 상품·가격·PG 결제 번호·상태 | 카드 번호 저장 안 함 |
 
-| 받지 않는 것 (필수 아님) | 대신 쓰는 것 |
-|---|---|
-| 상세 주소(동·호수) | `room_nickname` 방 별칭 |
-| 집주인 실명·전화번호·계좌번호 | 받지 않음. 문의 문자는 사용자가 직접 복사해 보낸다 |
-| 주민등록번호 | 어떤 기능에도 필요 없음. 입력란을 두지 않는다 |
-| 공제 메시지 본문 전체 | 항목명·금액·짧은 원문 인용만 (사용자가 저장을 고를 때만) |
-| 카드 번호 | PG사 결제 번호만 |
-| 사진 위치정보(EXIF GPS) | 브라우저에서 지운 뒤 보관(유료 기록북 보관을 고를 때만) |
-
-- 사진 원본은 기본적으로 서버에 올리지 않는다(현재와 같음). 유료 기록북 재다운로드를 고른 사용자만, 위치정보를 지운 이미지를 올린다.
-- `INQUIRY`는 문의 진행 상태를 사용자가 직접 적는 기록이다. 서비스가 상대방에게 연락하거나 자동 발송하지 않는다.
-- 보관 기간·파기 절차는 [PRIVACY_LEGAL.md](PRIVACY_LEGAL.md) 참고.
+집주인 실명·전화번호·계좌번호는 향후에도 받지 않는다. 문의 문자는 사용자가 직접 복사해 보낸다.

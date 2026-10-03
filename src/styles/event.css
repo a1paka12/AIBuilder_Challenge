@@ -1,0 +1,119 @@
+/*
+ * 이벤트 상세 (#/event) — 은행 누리집 이벤트 상세 꼴
+ * 머리(상태 배지 · 제목 · 한 줄 요약, 2px 검정 밑줄) · 키 비주얼 배너 · 안내 표(정의 목록) · 바로 참여(설문) · 유의사항 · 다른 업무
+ */
+.event { min-width: 0; }
+.event > * + * { margin-top: 16px; }
+
+/* 머리 */
+.event-head { padding-bottom: 14px; border-bottom: 2px solid var(--text); }
+.event-status { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 0 0 8px; }
+.event-head h1 { margin: 0 0 6px; }
+.event-summary { margin: 0; max-width: 640px; font-size: 16px; line-height: 1.6; color: #3b424c; }
+
+/* 혜택 적용 안내 (role=status) — 비어 있을 땐 자리를 차지하지 않는다 */
+.event-done-wrap:empty { display: block; height: 0; margin: 0; overflow: hidden; }
+.event-done { background: var(--success-bg, #e7f5ee); border-color: #b7e0cb; border-left-color: var(--success, #0a7a4f); }
+.event-done strong { color: var(--success, #0a7a4f); }
+.event-done-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+
+/* 키 비주얼 배너 */
+.event-banner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+  align-items: center;
+  gap: 12px 24px;
+  padding: 22px 28px;
+  background: linear-gradient(135deg, var(--primary-soft) 0%, var(--surface) 72%);
+  border: 1px solid #d3e0f1;
+  border-top: 4px solid var(--primary);
+  border-radius: var(--radius);
+  color: var(--primary);
+  overflow: hidden;
+}
+.event-banner-text { min-width: 0; color: var(--text); }
+.event-banner-kicker { margin: 0 0 6px; font-size: 13px; font-weight: 700; letter-spacing: 0.04em; color: var(--primary); }
+.event-banner-title { margin: 0 0 6px; font-size: 22px; line-height: 1.3; font-weight: 800; letter-spacing: -0.03em; color: var(--text); }
+.event-banner-sub { margin: 0; color: var(--muted); }
+.event-banner svg { display: block; width: 100%; max-width: 560px; height: auto; margin: 0 auto; }
+
+/* 안내 표 (정의 목록) */
+.event-card h2 { margin: 0 0 6px; font-size: 19px; }
+.event-dl { margin: 0; border-top: 2px solid var(--text); }
+.event-dl > div {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 4px 16px;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--line);
+}
+.event-dl dt { font-weight: 700; color: var(--primary-dark); line-height: 1.6; }
+.event-dl dd { margin: 0; min-width: 0; line-height: 1.6; }
+.event-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.event-steps li { display: flex; align-items: flex-start; gap: 8px; }
+.event-steps b {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-top: 2px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+/* 바로 참여 — 설문 카드의 기본 위 여백은 이 화면 간격으로 맞춘다 */
+.event .survey { margin-top: 0; }
+.event .section-head { margin: 28px 0 12px; }
+.event .section-head + .survey { margin-top: 0; }
+
+/* 유의사항 */
+.event-notes { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 15px; line-height: 1.6; }
+.event-notes li::marker { color: var(--primary); }
+
+/* 다른 업무 보기 */
+.event-links { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.event-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: 60px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  color: var(--text);
+  text-align: left;
+  transition: border-color 0.12s, color 0.12s;
+}
+.event-link:hover { border-color: var(--primary); color: var(--primary); }
+.event-link-text { display: grid; gap: 2px; min-width: 0; }
+.event-link-text b { font-size: 15px; font-weight: 700; line-height: 1.4; }
+.event-link-text span { font-size: 13px; color: var(--muted); line-height: 1.5; }
+.event-link svg { flex: none; color: var(--primary); }
+
+@media (max-width: 760px) {
+  .event-links { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+}
+@media (max-width: 640px) {
+  .event-banner { grid-template-columns: minmax(0, 1fr); padding: 18px 16px; }
+  .event-banner svg { max-width: 360px; }
+  .event-banner-title { font-size: 20px; }
+  .event-dl > div { grid-template-columns: minmax(0, 1fr); gap: 2px; padding: 10px 2px; }
+  .event .section-head { margin-top: 24px; }
+  .event-done-actions .btn { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .event-link { transition: none; }
+}
+@media print {
+  .event-links, .event-done-actions { display: none; }
+}

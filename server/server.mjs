@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS metrics (
 );
 `)
 const PRICES = { book: 4900, cert: 2900 }
-const METRIC_EVENTS = new Set(['extract_ok', 'copy_message', 'cert_pdf', 'book_pdf', 'receipt'])
+const METRIC_EVENTS = new Set(['extract_ok', 'copy_message', 'cert_pdf', 'book_pdf', 'receipt', 'popup_event', 'popup_help', 'lawyer_search'])
 const kstDay = () => new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10)
 const bump = db.prepare(`INSERT INTO metrics (day, event, count) VALUES (?, ?, 1)
   ON CONFLICT(day, event) DO UPDATE SET count = count + 1`)
@@ -94,16 +94,22 @@ function rateLimit(req, res, next) {
 }
 
 // ── 개인정보 패턴 가림 (AI 응답에 섞여 나오면 가림) ─────────────────────
+// 토큰은 화면(src/lib/mask.ts MASK_TOKEN)과 같은 08 명세 형식. 토큰에는 숫자·@가 없어 이미 가린 자리는 다시 걸리지 않는다.
+const PII_DATE_RE = /^(19|20)\d{2}[-./](0?[1-9]|1[0-2])[-./](0?[1-9]|[12]\d|3[01])$/
 const PII_PATTERNS = [
-  /\d{6}\s?-\s?[1-4]\d{6}/g, // 주민등록번호
-  /01[016789][-\s.]?\d{3,4}[-\s.]?\d{4}/g, // 휴대전화
-  /0\d{1,2}[-\s.]\d{3,4}[-\s.]\d{4}/g, // 일반전화
-  /\d{2,6}-\d{2,6}-\d{2,8}(-\d{1,6})?/g, // 계좌번호(하이픈 묶음)
-  /[\w.+-]+@[\w-]+\.[\w.]+/g, // 이메일
+  { re: /(?<!\d)\d{6}\s?-\s?[1-4]\d{6}(?!\d)/g, token: '[주민등록번호 삭제]' }, // 주민등록번호
+  { re: /(?<!\d)01[016789][-\s.]?\d{3,4}[-\s.]?\d{4}(?!\d)/g, token: '[전화번호 삭제]' }, // 휴대전화
+  { re: /(?<!\d)0\d{1,2}[-\s.]\d{3,4}[-\s.]\d{4}(?!\d)/g, token: '[전화번호 삭제]' }, // 일반전화
+  {
+    re: /(?<!\d)\d{2,6}-\d{2,6}-\d{2,8}(-\d{1,6})?(?!\d)/g, // 계좌번호(하이픈 묶음) — 날짜·10자리 미만은 남긴다
+    token: '[계좌번호 삭제]',
+    accept: (m) => !PII_DATE_RE.test(m) && m.replace(/\D/g, '').length >= 10,
+  },
+  { re: /[\w.+-]+@[\w-]+\.[\w.]+/g, token: '[이메일 삭제]' }, // 이메일
 ]
 function maskPII(s) {
   let out = String(s ?? '')
-  for (const re of PII_PATTERNS) out = out.replace(re, '●●●')
+  for (const { re, token, accept } of PII_PATTERNS) out = out.replace(re, (m) => (accept && !accept(m) ? m : token))
   return out
 }
 const norm = (s) => String(s ?? '').replace(/\s+/g, '')
@@ -145,8 +151,10 @@ const SCHEMA = {
 }
 
 // 예시 문장 — AI가 실패해도 예시는 저장된 결과로 보여 준다(화면에 "저장된 예시 결과" 표시)
+// 브라우저가 보내는 것은 "기기 내 개인정보 제거"를 거친 처리본이므로(src/lib/mask.ts), 여기에는 처리본을 적는다.
+// 화면 쪽 원문(src/api.ts SAMPLE_TEXT)의 "국민 123456-01-234567" → "[계좌번호 삭제]", "010-1234-5678" → "[전화번호 삭제]". 비교는 공백 무시(norm).
 export const SAMPLE_TEXT =
-  '퇴실 정산입니다. 청소비 15만원, 도배 전체 30만원, 장판 25만원, 싱크대 시트지 5만원, 샷시 손잡이 3만원입니다. 총 78만원을 공제하려고 합니다.'
+  '퇴실 정산입니다. 청소비 15만원, 도배 전체 30만원, 장판 25만원, 싱크대 시트지 5만원, 샷시 손잡이 3만원입니다. 총 78만원을 공제하려고 합니다. 입금은 국민 [계좌번호 삭제]로 해 주세요. 문의 [전화번호 삭제]'
 const SAMPLE_RESULT = {
   items: [
     { name: '청소비', amount: 150000, quote: '청소비 15만원', needs_check: false, check_reason: null },
@@ -302,7 +310,7 @@ app.post('/api/survey', rateLimit, (req, res) => {
 // ── 익명 사용 집계(내용 없이 횟수만) ──────────────────────────────────────────
 app.post('/api/metric', rateLimit, (req, res) => {
   const event = String(req.body?.event || '')
-  if (!['copy_message', 'cert_pdf', 'book_pdf'].includes(event)) return res.status(400).json({ error: 'bad_event' })
+  if (!['copy_message', 'cert_pdf', 'book_pdf', 'popup_event', 'popup_help', 'lawyer_search'].includes(event)) return res.status(400).json({ error: 'bad_event' })
   track(event)
   return res.json({ ok: true })
 })

@@ -1,45 +1,98 @@
-/* 공제 정리 화면 (FR-01 ~ FR-04) */
-.dd { display: grid; gap: 16px; }
+/*
+ * 공제 정리 화면 (FR-01 ~ FR-04)
+ * 공공 누리집 톤: 남색 주색 · 밝은 회색 배경 · 흰 카드 + 1px 테두리 · 6px 모서리 · 그림자 최소
+ * 간격 단위 4/8/12/16/24/32 · 숫자는 tabular-nums · 모바일(390px)은 표를 카드로 바꾼다
+ */
+.dd {
+  --dd-ok: var(--success, #0a7a4f);
+  --dd-warn-line: #e07b00;
+  --dd-warn-soft: #f0d3a0;
+  --dd-mark: #fff1b8;
+  --dd-mark-line: #e9c46a;
+  --dd-bubble: #f3f7fd;
+  --dd-bubble-line: #c9d8ee;
+  --dd-askbar-h: 64px;
+  display: grid;
+  gap: 16px;
+}
+.dd > * { min-width: 0; }
 .dd h1 { margin: 0; }
 .dd-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .dd-top-note { margin: -8px 0 0; }
-.dd-results { display: grid; gap: 16px; }
 
-.dd-section h2 { margin-top: 0; }
-.dd-step-title { display: flex; align-items: center; gap: 8px; font-size: 18px; }
+/* 결과 영역은 블록 흐름(하단 고정 막대의 sticky 기준 상자) */
+.dd-results { scroll-margin-top: 80px; }
+.dd-results > * + * { margin-top: 16px; }
+
+/* ── 진행 단계 ───────────────────────── */
+.dd-steps {
+  list-style: none; margin: 0; padding: 12px 8px 8px;
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+}
+.dd-step { position: relative; min-width: 0; }
+.dd-step::before, .dd-step::after {
+  content: ''; position: absolute; top: 17px; width: 50%; height: 2px; background: var(--line);
+}
+.dd-step::before { left: 0; }
+.dd-step::after { right: 0; }
+.dd-step:first-child::before, .dd-step:last-child::after { display: none; }
+.dd-step.done::before, .dd-step.done::after, .dd-step.current::before { background: var(--primary); }
+.dd-step-btn {
+  position: relative; z-index: 1; width: 100%; min-height: 44px;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 4px 0; background: none; border: 0; color: inherit; border-radius: var(--radius-sm);
+}
+button.dd-step-btn:hover .dd-step-label { color: var(--primary-dark); }
+span.dd-step-btn { cursor: default; }
+.dd-step-no {
+  display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px;
+  border-radius: 50%; background: var(--surface); border: 2px solid var(--line-strong);
+  color: var(--muted); font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums;
+}
+.dd-step-label { font-size: 13px; font-weight: 600; color: var(--muted); white-space: nowrap; line-height: 1.2; }
+.dd-step.done .dd-step-no { background: var(--primary); border-color: var(--primary); color: #fff; }
+.dd-step.done .dd-step-label { color: var(--text); }
+.dd-step.current .dd-step-no { border-color: var(--primary); color: var(--primary); box-shadow: 0 0 0 4px var(--primary-soft); }
+.dd-step.current .dd-step-label { color: var(--primary-dark); font-weight: 800; }
+
+/* ── 섹션 카드 ───────────────────────── */
+.dd-section { padding: 20px; }
+.dd-step-title {
+  display: flex; align-items: center; gap: 10px; margin: 0 0 16px; padding-bottom: 12px;
+  border-bottom: 1px solid var(--line); font-size: 18px; scroll-margin-top: 80px;
+}
 .dd-step-title b {
-  display: inline-flex; flex: none; width: 26px; height: 26px; border-radius: 50%;
+  display: inline-flex; flex: none; width: 28px; height: 28px; border-radius: 50%;
   background: var(--primary); color: #fff; align-items: center; justify-content: center; font-size: 14px;
 }
-.dd-guide { margin: 0 0 8px; font-weight: 600; }
+.dd-guide { margin: 0 0 4px; font-weight: 600; }
+.dd-guide-sub { margin: 0 0 10px; line-height: 1.55; }
 
+/* ── 입력 ───────────────────────── */
 .dd-textarea {
-  width: 100%;
-  min-height: 96px;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--surface);
-  color: var(--text);
-  resize: vertical;
-  line-height: 1.6;
+  width: 100%; min-height: 120px; padding: 12px 14px;
+  border: 1px solid var(--line-strong); border-radius: var(--radius);
+  background: var(--surface); color: var(--text); resize: vertical; line-height: 1.6; font-size: 15px;
 }
-.dd-textarea.over { border-color: var(--danger); }
-.dd-textarea:focus, .dd-input:focus { outline: 2px solid var(--primary); outline-offset: 1px; }
+.dd-textarea-sm { min-height: 88px; }
+.dd-textarea.over { border-color: var(--danger); background: var(--danger-bg); }
+.dd-textarea:focus-visible, .dd-input:focus-visible { border-color: var(--primary); }
 .dd-input {
-  width: 100%;
-  min-height: 40px;
-  padding: 8px 10px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--text);
+  width: 100%; min-height: 44px; padding: 8px 12px;
+  border: 1px solid var(--line-strong); border-radius: var(--radius);
+  background: var(--surface); color: var(--text);
 }
-.dd-input-meta { display: flex; justify-content: flex-end; margin-top: 4px; }
-.dd-row-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-.dd-btn { min-height: 38px; padding: 6px 12px; font-size: 14px; border-radius: 8px; }
+.dd-input-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+.dd-counter { font-variant-numeric: tabular-nums; }
+.dd-row-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.dd-btn { min-height: 40px; padding: 6px 14px; font-size: 14px; }
 .dd-error { color: var(--danger); }
-.dd-hint { margin: 10px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--warn-bg); color: var(--warn); font-weight: 600; font-size: 14px; }
+.dd-hint {
+  margin: 12px 0 0; padding: 10px 12px; border-radius: var(--radius);
+  background: var(--warn-bg); border: 1px solid var(--dd-warn-soft); border-left: 4px solid var(--dd-warn-line);
+  color: var(--warn); font-weight: 600; font-size: 14px;
+}
 .dd-notice { margin: 6px 0 0; color: var(--warn); }
 
 .dd-loading { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 12px; font-weight: 600; }
@@ -49,131 +102,364 @@
   animation: dd-spin 0.8s linear infinite;
 }
 @keyframes dd-spin { to { transform: rotate(360deg); } }
-.dd-errorbox { margin-top: 12px; padding: 12px 14px; border-radius: 10px; border: 1px solid #f3c7c2; background: #fff5f4; }
+.dd-errorbox {
+  margin-top: 12px; padding: 12px 14px; border-radius: var(--radius);
+  border: 1px solid #f3c7c2; border-left: 4px solid var(--danger); background: var(--danger-bg);
+}
 .dd-errorbox p { margin: 0 0 4px; }
 
-.dd-warnbox { padding: 12px 14px; border-radius: 10px; background: var(--warn-bg); border: 1px solid #f6d9b5; color: var(--warn); }
+/* 처리 중 스켈레톤 — 표 자리 회색 줄 */
+.dd-skeleton { display: grid; gap: 12px; padding: 20px; }
+.dd-skel-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.dd-skel {
+  display: block; height: 16px; border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, #e3e7ec 25%, #f1f3f6 50%, #e3e7ec 75%);
+  background-size: 200% 100%; animation: dd-shimmer 1.4s ease-in-out infinite;
+}
+.dd-skel-chip { width: 44px; height: 22px; }
+.dd-skel-title { width: 36%; height: 18px; }
+.dd-skel-line { width: 100%; }
+.dd-skel-line + .dd-skel-line { width: 84%; }
+.dd-skel-line.short { width: 58%; }
+@keyframes dd-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+.dd-warnbox {
+  display: flex; gap: 10px; align-items: flex-start; margin: 0;
+  padding: 12px 14px; border-radius: var(--radius);
+  background: var(--warn-bg); border: 1px solid var(--dd-warn-soft); border-left: 4px solid var(--dd-warn-line); color: var(--warn);
+}
+.dd-warnbox svg { flex: none; margin-top: 2px; }
 .dd-warnbox strong { color: var(--warn); }
 
-/* 특약·계약자 */
+/* ── 전송본 확인(FR-01 기기 내 개인정보 제거) ───────────────────────── */
+.dd-review-section .dd-step-title:focus-visible { outline-offset: 4px; }
+.dd-review { display: grid; gap: 12px; }
+.dd-review-lead { margin: 0; line-height: 1.6; }
+.dd-review-box { padding: 12px 14px; border-radius: var(--radius); background: var(--bg); border: 1px solid var(--line); }
+.dd-review-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px 8px; margin-bottom: 8px; }
+.dd-processed { border-color: var(--line-strong); }
+/* 가린 자리: 남색 알약 — 원문 인용 강조(노란 mark)와 구분 */
+.dd-mask, .dd-raw mark.dd-mask {
+  display: inline-block; padding: 0 7px; border-radius: 4px; box-shadow: none;
+  background: var(--navy); color: #fff; font-weight: 700; font-size: 13px; line-height: 1.6; white-space: nowrap;
+}
+.dd-mask-summary { margin: 8px 0 0; font-size: 14px; }
+.dd-mask-summary strong { color: var(--primary-dark); font-variant-numeric: tabular-nums; }
+.dd-words { display: grid; gap: 6px; }
+.dd-word-row { display: flex; gap: 8px; }
+.dd-word-row .dd-input { flex: 1 1 auto; min-width: 0; }
+.dd-word-row .dd-word-kind { flex: 0 0 auto; width: auto; min-width: 84px; }
+.dd-chip-kind { font-size: 12px; font-weight: 700; color: var(--primary-dark); }
+.dd-word-row .btn { flex: none; min-height: 44px; }
+.dd-word-chips { list-style: none; margin: 2px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.dd-chip {
+  display: inline-flex; align-items: center; gap: 2px; min-height: 44px; padding-left: 12px;
+  border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface); font-weight: 600; font-size: 14px;
+}
+.dd-chip-text { overflow-wrap: anywhere; }
+.dd-chip-x {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 40px; min-height: 42px;
+  border: 0; background: none; border-radius: 999px; color: var(--muted); font-size: 20px; line-height: 1;
+}
+.dd-chip-x:hover { color: var(--danger); }
+.dd-words-note { margin: 0; }
+.dd-review-notice { font-size: 14px; }
+.dd-review-check { margin-top: 4px; }
+.dd-review-check-note { margin: 0; }
+/* 입력부 버튼 묶음과 전송 안내 */
+.dd-input-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.dd-send-note { margin: 8px 0 0; }
+/* 참고 자료(공개 자료) 상시 블록 */
+.dd-refs-block { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+.dd-refs-block-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.dd-refs-scope { margin: 0 0 8px; }
+.dd-review-ok { display: flex; gap: 8px; align-items: flex-start; margin: 0; font-weight: 700; color: var(--dd-ok); }
+.dd-review-ok svg { flex: none; margin-top: 3px; }
+.dd-review-done .dd-mask-summary { margin: 0; }
+.dd-review-details summary {
+  display: flex; align-items: center; min-height: 44px; cursor: pointer;
+  font-weight: 600; color: var(--primary-dark); list-style-position: inside;
+}
+.dd-review-details .dd-processed { margin-top: 4px; }
+
+/* 상태 알림(live): 비어 있으면 자리만 지키고, 내용이 생기면 보인다 */
+.dd-live { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-weight: 600; }
+.dd-live:not(:empty) { margin-top: 12px; }
+.dd-live.is-done { color: var(--dd-ok); }
+.dd-live svg { flex: none; }
+
+/* ── 특약·계약자 ───────────────────────── */
 .dd-contract {
-  display: grid; grid-template-columns: 2fr 1fr; gap: 14px;
-  padding: 12px; margin-bottom: 14px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line);
+  display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 16px;
+  padding: 14px 16px; margin-bottom: 16px; border-radius: var(--radius); background: var(--bg); border: 1px solid var(--line);
 }
 .dd-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .dd-label { font-weight: 700; font-size: 14px; }
 .dd-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
-/* 표 */
+/* ── 표 머리 ───────────────────────── */
 .dd-table-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-.dd-table-title { margin: 0; font-size: 17px; }
-.dd-cache { margin: 4px 0 0; }
-.dd-table-wrap { margin-top: 10px; }
-.dd-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.dd-table-title { margin: 0; font-size: 17px; line-height: 1.3; padding-left: 10px; border-left: 3px solid var(--primary); }
+.dd-cache { margin: 6px 0 0; }
+.dd-help { margin: 6px 0 0; }
+
+/* ── 표(데스크톱) ───────────────────────── */
+.dd-table-wrap { margin-top: 12px; }
+.dd-table { width: 100%; border-collapse: collapse; font-size: 14px; border-top: 2px solid var(--text); }
 .dd-table th {
-  text-align: left; font-size: 12px; color: var(--muted); font-weight: 700;
-  padding: 8px 6px; border-bottom: 1px solid var(--line); white-space: nowrap;
+  text-align: left; font-size: 13px; color: var(--text); font-weight: 700;
+  padding: 10px 8px; background: var(--table-head); border-bottom: 1px solid var(--line-strong); white-space: nowrap;
 }
-.dd-table td { padding: 10px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
-.dd-row.selected { background: #f3f6ff; }
+.dd-table th:first-child { padding-left: 12px; }
+.dd-table td { padding: 12px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.dd-th-amount, .dd-td-amount { text-align: right; }
+.dd-row td:first-child { border-left: 4px solid transparent; }
+.dd-row.is-ok td:first-child { border-left-color: var(--dd-ok); }
+.dd-row.is-warn td:first-child { border-left-color: var(--dd-warn-line); }
+.dd-row:not(.selected):hover { background: #f8fafc; }
+.dd-row.selected { background: var(--primary-soft); }
 .dd-row.expanded td { border-bottom-color: transparent; }
+
 .dd-name {
   display: inline-flex; align-items: center; gap: 6px; text-align: left;
   background: none; border: 0; padding: 4px 0; min-height: 32px;
-  color: var(--primary); font-weight: 700; text-decoration: underline; text-underline-offset: 3px;
+  color: var(--primary-dark); font-weight: 700; font-size: 15px; line-height: 1.4;
 }
-.dd-caret { font-size: 10px; text-decoration: none; }
-.dd-amount { font-weight: 700; white-space: nowrap; }
-.dd-amount-input { max-width: 140px; }
-.dd-amount-preview { display: block; margin-top: 2px; }
+.dd-name-text { text-decoration: underline; text-decoration-color: rgba(11, 78, 162, 0.35); text-underline-offset: 3px; overflow-wrap: anywhere; }
+.dd-name:hover .dd-name-text { text-decoration-color: currentColor; }
+.dd-caret { flex: none; color: var(--primary); transition: transform 0.15s; }
+.dd-caret.open { transform: rotate(180deg); }
+.dd-amount { font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; font-size: 15px; }
+.dd-amount-none { font-weight: 600; }
+.dd-amount-input { max-width: 140px; text-align: right; font-variant-numeric: tabular-nums; }
+.dd-amount-preview { display: block; margin-top: 2px; font-variant-numeric: tabular-nums; }
 .dd-quote { display: inline-flex; flex-direction: column; gap: 4px; align-items: flex-start; color: var(--muted); }
 .dd-status { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
 .dd-actions { display: flex; flex-wrap: wrap; gap: 4px; }
-.dd-del { color: var(--danger); }
-.dd-check { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; white-space: nowrap; min-height: 32px; cursor: pointer; }
-.dd-check input { width: 18px; height: 18px; accent-color: var(--primary); }
+.dd .btn.dd-del { color: var(--danger); border-color: transparent; }
+.dd .btn.dd-del:hover { color: var(--danger); border-color: var(--danger); background: var(--danger-bg); }
+.dd-check { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; white-space: nowrap; min-height: 32px; cursor: pointer; }
+/* 체크박스 누르는 영역 24px 이상(데스크톱 포함) — 라벨 글자까지 누를 수 있다 */
+.dd-check input { width: 24px; height: 24px; margin: 0; flex: none; accent-color: var(--primary); cursor: inherit; }
 .dd-check.disabled { color: var(--muted); cursor: not-allowed; }
-.dd-option { white-space: normal; margin-top: 10px; align-items: flex-start; }
-.dd-option input { margin-top: 3px; flex: none; }
-.dd-empty td { text-align: center; color: var(--muted); padding: 18px 6px; }
-.dd-table-foot { margin-top: 10px; }
+.dd-option { white-space: normal; margin-top: 12px; align-items: flex-start; min-height: 44px; }
+.dd-option input { margin-top: 3px; }
+.dd-empty td { text-align: center; color: var(--muted); padding: 20px 8px; }
+.dd-table-foot { margin-top: 12px; }
 
-.dd-expand td { background: var(--bg); padding: 12px; }
-.dd-expand-inner { display: grid; gap: 12px; }
-.dd-subhead { margin: 0 0 6px; font-size: 14px; }
-.dd-raw { margin: 0; padding: 10px 12px; border-radius: 8px; background: var(--surface); border: 1px solid var(--line); white-space: pre-wrap; word-break: break-word; }
-.dd-raw mark { background: #fde68a; color: inherit; padding: 0 2px; border-radius: 3px; }
-
-/* 참고 자료 카드 */
-.dd-refs p { margin: 0 0 8px; }
-.dd-ref-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
-.dd-ref { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
-.dd-ref-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 6px; }
-.dd-ref-title { font-size: 14px; }
-.dd-ref-body { margin: 0 0 6px !important; font-size: 14px; }
-.dd-ref-kind { display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: 4px; background: var(--bg); border: 1px solid var(--line); font-size: 12px; font-weight: 700; color: var(--muted); }
-.dd-ref-note { color: var(--warn); }
-.dd-ref-meta { margin: 0 !important; word-break: break-all; }
-
-.dd-basis { margin: 10px 0 0; color: var(--muted); }
-.dd-sums { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
-.dd-sums p { margin: 2px 0; }
-.dd-sum-main { display: flex; justify-content: space-between; gap: 8px; font-weight: 600; }
-
-/* 내가 근거를 물어볼 금액 — 하단 고정 */
-.dd-askbar {
-  position: sticky; bottom: 8px; z-index: 5;
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 12px 16px; border-radius: var(--radius);
-  background: #10204a; color: #fff; box-shadow: 0 6px 18px rgba(16, 24, 40, 0.18);
+/* 펼친 행: 원문 + 참고 자료 */
+.dd-expand td { background: var(--bg); padding: 16px; border-bottom: 1px solid var(--line); }
+.dd-expand-inner { display: grid; gap: 16px; }
+.dd-subhead { margin: 0 0 8px; font-size: 14px; line-height: 1.3; padding-left: 8px; border-left: 3px solid var(--primary); }
+.dd-raw {
+  margin: 0; padding: 12px 14px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line);
+  white-space: pre-wrap; word-break: break-word; font-size: 14px; line-height: 1.7;
 }
-.dd-askbar > div { display: flex; flex-direction: column; }
-.dd-askbar-label { font-weight: 700; font-size: 14px; }
-.dd-askbar-count { opacity: 0.8; }
-.dd-askbar-total { font-size: 24px; letter-spacing: -0.01em; white-space: nowrap; }
+.dd-raw mark { background: var(--dd-mark); color: inherit; padding: 1px 3px; border-radius: 3px; box-shadow: inset 0 -1px 0 var(--dd-mark-line); }
 
-/* 문의 문자 */
+/* ── 참고 자료 카드 ───────────────────────── */
+.dd-refs p { margin: 0 0 8px; }
+.dd-ref-list { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px; }
+.dd-ref { display: flex; flex-direction: column; gap: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; }
+.dd-ref.caution { border-color: #e3962b; border-left: 4px solid var(--dd-warn-line); }
+.dd-ref-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.dd-ref-kind { display: inline-block; padding: 1px 8px; border-radius: var(--radius-sm); background: var(--navy); color: #fff; font-size: 12px; font-weight: 700; line-height: 1.5; }
+.dd-ref-title { font-size: 14px; line-height: 1.45; }
+.dd-ref-body { margin: 0 !important; font-size: 14px; line-height: 1.6; padding-left: 10px; border-left: 2px solid var(--line-strong); }
+.dd-ref-note { display: flex; gap: 6px; align-items: flex-start; margin: 0 !important; color: var(--warn); }
+.dd-ref-note svg { flex: none; margin-top: 3px; }
+.dd-ref-meta { margin: 0 !important; word-break: keep-all; overflow-wrap: anywhere; }
+.dd-ref-meta a { display: inline-flex; align-items: center; gap: 3px; }
+.dd-ref-meta a svg { flex: none; }
+.dd-ref-date { white-space: nowrap; }
+/* 표준계약서 카드: 공공누리 제4유형 마크 + 출처 문구 + 원문 링크 */
+.dd-ref-kogl { display: flex; flex-direction: column; gap: 4px; }
+.dd-ref-kogl .mark-kogl-text { color: var(--muted); line-height: 1.5; }
+.dd-ref-kogl-links { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px 4px; }
+
+/* ── 합계 ───────────────────────── */
+.dd-basis { margin: 12px 0 0; color: var(--muted); }
+.dd-sums { margin-top: 12px; padding: 12px 14px; border-radius: var(--radius); background: var(--bg); border: 1px solid var(--line); }
+.dd-sums p { margin: 2px 0; }
+.dd-sum-main { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-weight: 600; }
+.dd-sum-main strong { font-size: 18px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dd-sum-sub { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ── 내가 근거를 물어볼 금액 — 하단 고정 ───────────────────────── */
+.dd-askbar {
+  position: sticky; bottom: 12px; z-index: 5;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: var(--dd-askbar-h); padding: 10px 18px; border-radius: var(--radius);
+  background: var(--navy); color: #fff; border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 14px rgba(15, 39, 71, 0.25);
+}
+.dd-askbar-main { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; }
+.dd-askbar-label { font-weight: 700; font-size: 14px; line-height: 1.3; }
+.dd-askbar-count {
+  display: inline-block; padding: 1px 8px; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14); font-size: 12px; font-weight: 600; line-height: 1.5; font-variant-numeric: tabular-nums;
+}
+.dd-askbar-total { font-size: 24px; font-weight: 800; letter-spacing: -0.01em; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.dd .toast { bottom: calc(var(--dd-askbar-h) + 28px); }
+
+/* ── 문의 문자 ───────────────────────── */
 .dd-message .dd-field { margin-bottom: 4px; }
-.dd-message-out { margin-top: 14px; display: grid; gap: 8px; }
+.dd-message-out { margin-top: 16px; display: grid; gap: 8px; }
 .dd-message-out p { margin: 0; }
-.dd-message-text { background: #fbfbfa; min-height: 160px; }
+.dd-bubble { position: relative; margin-top: 2px; }
+.dd-bubble::before {
+  content: ''; position: absolute; left: 20px; top: -7px; width: 12px; height: 12px;
+  background: var(--dd-bubble); border-left: 1px solid var(--dd-bubble-line); border-top: 1px solid var(--dd-bubble-line);
+  transform: rotate(45deg);
+}
+.dd-message-text {
+  display: block; background: var(--dd-bubble); border-color: var(--dd-bubble-line);
+  border-radius: 12px; border-top-left-radius: 4px; min-height: 160px; padding: 14px 16px;
+  resize: none; font-size: 15px; line-height: 1.7;
+}
+.dd-copy-row { margin-top: 4px; }
+.dd .btn.dd-copy { min-width: 180px; gap: 8px; font-size: 16px; }
 
-/* 다음 단계 */
-.dd-next-body { margin-top: 14px; display: grid; gap: 6px; }
-.dd-next-body h3 { margin: 12px 0 4px; }
-.dd-list { margin: 4px 0; padding-left: 20px; }
+/* ── 다음 단계 ───────────────────────── */
+.dd-next-body { margin-top: 16px; display: grid; gap: 12px; }
+.dd-next-body h3 { margin: 8px 0 0; font-size: 15px; line-height: 1.3; padding-left: 10px; border-left: 3px solid var(--primary); }
+.dd-list { margin: 0; padding-left: 20px; }
 .dd-list li { margin: 2px 0; }
-.dd-orgs { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
-.dd-org { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
-.dd-org a { word-break: break-all; }
+.dd-checklist { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.dd-checklist li {
+  display: flex; gap: 8px; align-items: flex-start; padding: 8px 12px;
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); font-size: 14px;
+}
+.dd-checklist svg { flex: none; margin-top: 3px; color: var(--dd-ok); }
+.dd-orgs { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; }
+.dd-org {
+  display: flex; flex-direction: column; gap: 2px; padding: 12px 14px;
+  border: 1px solid var(--line); border-left: 4px solid var(--primary); border-radius: var(--radius); background: var(--surface);
+}
+.dd-org-name { font-size: 15px; line-height: 1.4; }
+.dd-org-detail { font-size: 13px; color: var(--muted); }
+.dd-org-link { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; margin-top: 4px; min-height: 32px; font-size: 13px; word-break: break-all; }
+.dd-org-link svg { flex: none; }
+.dd-org-checked { font-variant-numeric: tabular-nums; }
 
-/* 모바일: 표 → 카드 */
+/* ── 모션 줄이기 ───────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .dd-skel { animation: none; background: #e3e7ec; }
+  .dd-spinner { animation: none; border-color: var(--primary); border-top-color: var(--chip); }
+  .dd-caret { transition: none; }
+}
+
+/* ── 모바일: 표 → 카드 ───────────────────────── */
 @media (max-width: 720px) {
+  .dd-section { padding: 16px; }
+  .dd-step-title { font-size: 17px; scroll-margin-top: 100px; }
+  .dd-results { scroll-margin-top: 100px; }
+  .dd-steps { padding: 10px 4px 8px; }
+  .dd-step-label { font-size: 11px; }
   .dd-contract, .dd-grid2 { grid-template-columns: 1fr; }
+  .dd-btn { min-height: 44px; }
+  .dd-row-actions .btn { flex: 1 1 auto; }
+  .dd-input-foot .btn { width: 100%; }
+  .dd-input-actions { width: 100%; }
+  .dd-input-actions .btn { flex: 1 1 100%; }
+  .dd-word-row .dd-word-kind { flex: 1 1 100%; }
+
+  .dd-table { border-top: 0; }
   .dd-table thead { display: none; }
   .dd-table, .dd-table tbody { display: block; }
   .dd-table tr.dd-row {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px;
-    padding: 12px; margin-bottom: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface);
+    display: grid; grid-template-columns: minmax(0, 1fr) max-content auto; gap: 4px 8px; align-items: start;
+    grid-template-areas:
+      'name amount check'
+      'quote quote check'
+      'status status status'
+      'actions actions actions';
+    padding: 10px 12px 12px; margin-bottom: 8px;
+    border: 1px solid var(--line); border-left: 4px solid var(--line-strong); border-radius: var(--radius); background: var(--surface);
   }
-  .dd-table tr.dd-row.selected { background: #f3f6ff; }
-  .dd-table tr.dd-row td { display: block; padding: 0; border: 0; }
-  .dd-table tr.dd-row td::before {
-    content: attr(data-label); display: block; font-size: 11px; font-weight: 700; color: var(--muted); margin-bottom: 2px;
+  .dd-table tr.dd-row.is-ok { border-left-color: var(--dd-ok); }
+  .dd-table tr.dd-row.is-warn { border-left-color: var(--dd-warn-line); }
+  .dd-table tr.dd-row.selected { background: var(--primary-soft); border-color: var(--dd-bubble-line); border-left-color: var(--dd-ok); }
+  .dd-table tr.dd-row td { display: block; min-width: 0; padding: 0; border: 0; }
+  .dd-table tr.dd-row td:first-child { border-left: 0; }
+  .dd-table tr.dd-row td::before { display: none; }
+  .dd-td-name { grid-area: name; }
+  .dd-td-amount { grid-area: amount; align-self: center; }
+  .dd-td-quote { grid-area: quote; }
+  .dd-td-status { grid-area: status; }
+  .dd-td-actions { grid-area: actions; margin-top: 6px; }
+  .dd-td-check { grid-area: check; justify-self: end; }
+
+  .dd-name { min-height: 28px; padding: 2px 0; font-size: 16px; }
+  .dd-amount { font-size: 16px; }
+  .dd-quote { font-size: 13px; }
+  .dd-status { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+  .dd-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .dd-table tr.dd-row.editing .dd-actions { grid-template-columns: repeat(2, 1fr); }
+  .dd-actions .dd-btn { min-height: 44px; padding: 6px 8px; }
+  .dd .btn.dd-del { border-color: var(--line); }
+
+  /* 물어볼 항목: 카드 오른쪽 위 큰 체크박스 (라벨 유지) */
+  .dd-check {
+    flex-direction: column; justify-content: center; gap: 2px; min-width: 64px; min-height: 52px; padding: 4px 6px;
+    border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg);
+    font-size: 11px; line-height: 1.2; color: var(--text);
   }
-  .dd-table tr.dd-row td[data-label='원문'],
-  .dd-table tr.dd-row td[data-label='버튼'],
-  .dd-table tr.dd-row td[data-label='물어볼 항목'] { grid-column: 1 / -1; }
-  .dd-table tr.dd-row td[data-label='버튼']::before,
-  .dd-table tr.dd-row td[data-label='물어볼 항목']::before { display: none; }
+  .dd-check input { width: 24px; height: 24px; }
+  .dd-check:has(input:checked) { background: var(--primary-soft); border-color: var(--primary); color: var(--primary-dark); }
+  .dd-check.disabled { background: var(--surface); border-style: dashed; color: var(--muted); }
+  .dd-option {
+    flex-direction: row; justify-content: flex-start; gap: 8px; min-width: 0; min-height: 44px; padding: 0;
+    border: 0; background: none; font-size: 14px; line-height: 1.5; color: var(--text);
+  }
+  .dd-option:has(input:checked) { border: 0; background: none; color: var(--text); }
+  .dd-option input { width: 24px; height: 24px; }
+  .dd-word-row { flex-wrap: wrap; }
+  .dd-word-row .btn { flex: 1 1 100%; }
+  .dd-table-foot .btn { width: 100%; }
+
+  /* 수정 중 행: 입력칸은 한 줄씩, 칸 이름 표시 */
+  .dd-table tr.dd-row.editing {
+    grid-template-areas:
+      'name name check'
+      'amount amount check'
+      'quote quote quote'
+      'status status status'
+      'actions actions actions';
+  }
+  .dd-table tr.dd-row.editing .dd-td-name::before,
+  .dd-table tr.dd-row.editing .dd-td-amount::before {
+    content: attr(data-label); display: block; font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 4px;
+  }
+  .dd-table tr.dd-row.editing .dd-td-amount { text-align: left; }
+  .dd-amount-input { max-width: none; }
+
   .dd-table tr.dd-row.expanded { margin-bottom: 0; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
-  .dd-table tr.dd-expand { display: block; margin-bottom: 10px; }
+  .dd-table tr.dd-expand { display: block; margin-bottom: 8px; }
   .dd-table tr.dd-expand td {
-    display: block; border: 1px solid var(--line); border-top: 0; border-radius: 0 0 12px 12px;
+    display: block; padding: 14px 12px;
+    border: 1px solid var(--line); border-top: 0; border-radius: 0 0 var(--radius) var(--radius);
   }
   .dd-table tr.dd-empty, .dd-table tr.dd-empty td { display: block; }
-  .dd-actions .dd-btn { flex: 1 1 auto; min-height: 42px; }
-  .dd-amount-input { max-width: none; }
-  .dd-askbar { bottom: 6px; padding: 10px 14px; }
-  .dd-askbar-total { font-size: 20px; }
+  .dd-table tr.dd-empty td { border: 1px dashed var(--line-strong); border-radius: var(--radius); }
+  .dd-ref-list { grid-template-columns: 1fr; }
+
+  /* 하단 고정 막대: 화면 끝까지, 홈 인디케이터 안전 영역 */
+  .dd-askbar {
+    bottom: 0; margin-left: -16px; margin-right: -16px; border-radius: 0; border: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+    box-shadow: 0 -4px 14px rgba(15, 39, 71, 0.2);
+  }
+  .dd-askbar-total { font-size: 22px; }
+  .dd .toast { bottom: calc(var(--dd-askbar-h) + 16px + env(safe-area-inset-bottom, 0px)); }
+
+  .dd-message-text { font-size: 15px; }
+  .dd .btn.dd-copy { width: 100%; min-height: 48px; }
+  .dd-orgs { grid-template-columns: 1fr; }
+}
+
+@media print {
+  .dd-askbar { position: static; box-shadow: none; }
+  .dd-steps { display: none; }
 }

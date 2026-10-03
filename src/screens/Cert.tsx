@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useStore } from '../state'
 import { go } from '../router'
+import { postMetric } from '../api'
 import '../styles/cert.css'
 
 /** 보증금과 관계없는 압박 문구 */
@@ -45,6 +46,7 @@ interface FieldGroup {
   fields: FieldDef[]
 }
 
+/* 문서 순서대로: 수신 → 발신 → 계약 → (공제 항목) → 반환 요청 → (선택 문단) */
 const GROUPS: FieldGroup[] = [
   {
     title: '받는 사람',
@@ -100,22 +102,39 @@ function todayISO(): string {
 
 const digitsOnly = (s: string) => s.replace(/[^0-9]/g, '')
 
-function moneyText(raw: string): string {
+/** 미리보기 빈칸 — 화면에서는 흐리게, 인쇄에서는 검정 */
+const Blank = () => <span className="cert-blank">{BLANK}</span>
+
+function moneyNode(raw: string): ReactNode {
   const d = digitsOnly(raw)
-  if (!d) return BLANK
-  return Number(d).toLocaleString('ko-KR')
+  return d ? Number(d).toLocaleString('ko-KR') : <Blank />
 }
 
-function dateText(iso: string): string {
+function dateNode(iso: string): ReactNode {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso)
-  if (!m) return BLANK
-  return `${m[1]}년 ${Number(m[2])}월 ${Number(m[3])}일`
+  return m ? `${m[1]}년 ${Number(m[2])}월 ${Number(m[3])}일` : <Blank />
 }
 
 const hasPressure = (s: string) => PRESSURE_RE.test(s)
+const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 let rowSeq = 0
 const newRowId = () => `cert-row-${Date.now()}-${rowSeq++}`
+
+/** 번호 배지가 붙은 입력 그룹 */
+function Group({ no, title, children }: { no: number; title: string; children: ReactNode }) {
+  return (
+    <fieldset className="card cert-group">
+      <legend>
+        <b className="cert-step" aria-hidden="true">
+          {no}
+        </b>
+        <span>{title}</span>
+      </legend>
+      {children}
+    </fieldset>
+  )
+}
 
 export default function Cert() {
   const { deduction } = useStore()
@@ -145,6 +164,8 @@ export default function Cert() {
   const [manualRows, setManualRows] = useState<ManualRow[]>([])
   const [modalOpen, setModalOpen] = useState(false)
   const cleanupRef = useRef<(() => void) | null>(null)
+  const openerRef = useRef<HTMLButtonElement>(null)
+  const modalBtnRef = useRef<HTMLButtonElement>(null)
 
   // 공제 정리에서 확인·체크한(금액이 숫자인) 항목만
   const autoItems = useMemo(
@@ -158,17 +179,41 @@ export default function Cert() {
 
   /** 압박 문구가 들어간 칸이면 미리보기에 넣지 않는다 */
   const safe = (s: string) => (s.trim() && !hasPressure(s) ? s.trim() : '')
-  const v = (key: FieldKey) => safe(form[key]) || BLANK
+  const v = (key: FieldKey): ReactNode => safe(form[key]) || <Blank />
 
   const blockedFields = GROUPS.flatMap((g) => g.fields).filter((f) => f.kind === 'text' && hasPressure(form[f.key]))
   const blockedRows = manualRows.filter((r) => hasPressure(r.name))
   const blocked = blockedFields.length > 0 || blockedRows.length > 0
+  const blockedNames = [
+    ...blockedFields.map((f) => f.label),
+    ...blockedRows.map((r) => `직접 추가 항목 ${manualRows.indexOf(r) + 1}`),
+  ]
 
   // 화면을 떠나면 인쇄 클래스 정리
   useEffect(() => () => cleanupRef.current?.(), [])
 
+  // 모달: 열리면 첫 버튼에 포커스, Esc로 닫기, 닫히면 연 버튼으로 복귀
+  useEffect(() => {
+    if (!modalOpen) return
+    modalBtnRef.current?.focus()
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setModalOpen(false)
+        openerRef.current?.focus()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [modalOpen])
+
+  function closeModal() {
+    setModalOpen(false)
+    openerRef.current?.focus()
+  }
+
   function printCert() {
     setModalOpen(false)
+    postMetric('cert_pdf') // 익명 횟수만 집계, 실패해도 인쇄에 영향 없음
     const body = document.body
     const done = () => {
       body.classList.remove(PRINT_CLASS)
@@ -200,14 +245,18 @@ export default function Cert() {
     set('refundAmount', String(rest))
   }
 
+  function jumpToPreview() {
+    document.getElementById('cert-preview')?.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'start' })
+  }
+
   // ── 미리보기 문장 ──────────────────────────────────────────
   const agent = safe(form.agentName)
   const tenant = v('tenantName')
-  const previewItems: { key: string; name: string; amount: string }[] = [
-    ...autoItems.map((it) => ({ key: it.id, name: safe(it.name) || BLANK, amount: (it.amount ?? 0).toLocaleString('ko-KR') })),
+  const previewItems: { key: string; name: ReactNode; amount: ReactNode }[] = [
+    ...autoItems.map((it) => ({ key: it.id, name: safe(it.name) || <Blank />, amount: (it.amount ?? 0).toLocaleString('ko-KR') })),
     ...manualRows
       .filter((r) => r.name.trim() || r.amount.trim())
-      .map((r) => ({ key: r.id, name: safe(r.name) || BLANK, amount: moneyText(r.amount) })),
+      .map((r) => ({ key: r.id, name: safe(r.name) || <Blank />, amount: moneyNode(r.amount) })),
   ]
   const optional: string[] = []
   if (optDelay) optional.push('반환이 늦어지는 경우 민법에 따른 지연손해금을 청구할 수 있음을 알려 드립니다.')
@@ -219,6 +268,7 @@ export default function Cert() {
 
   function renderField(f: FieldDef): ReactNode {
     const id = `cert-f-${f.key}`
+    const errId = `${id}-err`
     const value = form[f.key]
     const bad = f.kind === 'text' && hasPressure(value)
     return (
@@ -243,20 +293,21 @@ export default function Cert() {
             autoComplete={f.autoComplete ?? 'off'}
             value={value}
             aria-invalid={bad}
-            aria-describedby={bad ? `${id}-err` : undefined}
+            aria-describedby={bad ? errId : undefined}
             className={bad ? 'is-bad' : undefined}
             onChange={(e) => set(f.key, e.target.value)}
           />
         )}
-        {bad && (
-          <p id={`${id}-err`} className="cert-err" role="alert">
-            {PRESSURE_MSG}
+        {f.kind === 'text' && (
+          /* 항상 렌더링되는 조용한 알림 영역: 내용이 생길 때만 읽어 준다 */
+          <p id={errId} className="cert-err" aria-live="polite">
+            {bad ? PRESSURE_MSG : ''}
           </p>
         )}
         {f.hint && !bad && <p className="cert-hint">{f.hint}</p>}
         {f.key === 'refundAmount' && depositSuggestion !== null && (
           <p className="cert-hint">
-            참고: 보증금 − 물어볼 항목 합계 = {depositSuggestion.toLocaleString('ko-KR')}원{' '}
+            참고: 보증금 − 물어볼 항목 합계 = <b>{depositSuggestion.toLocaleString('ko-KR')}원</b>{' '}
             <button type="button" className="linklike" onClick={fillRefundSuggestion}>
               이 금액 넣기
             </button>
@@ -266,21 +317,36 @@ export default function Cert() {
     )
   }
 
+  const renderGroup = (g: FieldGroup, no: number) => (
+    <Group no={no} title={g.title} key={g.title}>
+      {g.title === '보내는 사람' && deduction.contractor === 'other' && (
+        <p className="cert-hint cert-hint-top">계약자가 다른 사람이면 계약자 이름을 발신인으로 적고, 내 이름은 대리인 칸에 적어 주세요.</p>
+      )}
+      <div className="cert-grid">{g.fields.map(renderField)}</div>
+    </Group>
+  )
+
   return (
     <section className="cert">
       <header className="cert-head">
-        <p className="cert-eyebrow">다음 단계 · 선택</p>
-        <h1>내용증명 서식</h1>
-        <p className="muted">입력하신 내용이 그대로 들어가는 빈칸형 서식이에요. 이 화면은 AI를 쓰지 않아요.</p>
-        <p className="muted small">입력값은 이 브라우저 안에서만 쓰이고 서버로 보내지 않아요. 새로고침하면 사라져요.</p>
+        <div className="cert-head-text">
+          <p className="cert-eyebrow">다음 단계 · 선택</p>
+          <h1>내용증명 서식</h1>
+          <p className="muted">입력하신 내용이 그대로 들어가는 빈칸형 서식이에요. 이 화면은 AI를 쓰지 않아요.</p>
+          <p className="muted small">입력값은 이 브라우저 안에서만 쓰이고 서버로 보내지 않아요. 새로고침하면 사라져요.</p>
+        </div>
+        <button type="button" className="btn ghost cert-jump" onClick={jumpToPreview}>
+          미리보기로 이동
+        </button>
       </header>
 
       <div className="cert-layout">
         {/* ── 입력 폼 ── */}
         <div className="cert-form">
-          <div className="card cert-items">
-            <h2>물어볼 항목</h2>
-            <p className="muted small">공제 정리에서 확인·체크한 항목이 들어가요.</p>
+          {GROUPS.slice(0, 3).map((g, i) => renderGroup(g, i + 1))}
+
+          <Group no={4} title="물어볼 항목">
+            <p className="muted small cert-group-lead">공제 정리에서 확인·체크한 항목이 들어가요.</p>
             {autoItems.length > 0 ? (
               <ul className="cert-auto-list">
                 {autoItems.map((it) => (
@@ -308,6 +374,7 @@ export default function Cert() {
               <div className="cert-manual">
                 {manualRows.map((r, i) => {
                   const bad = hasPressure(r.name)
+                  const errId = `${r.id}-err`
                   return (
                     <div className="cert-manual-row" key={r.id}>
                       <div className="cert-manual-inputs">
@@ -318,6 +385,7 @@ export default function Cert() {
                           value={r.name}
                           className={bad ? 'is-bad' : undefined}
                           aria-invalid={bad}
+                          aria-describedby={bad ? errId : undefined}
                           onChange={(e) => updateRow(r.id, { name: e.target.value })}
                         />
                         <input
@@ -332,11 +400,9 @@ export default function Cert() {
                           삭제
                         </button>
                       </div>
-                      {bad && (
-                        <p className="cert-err" role="alert">
-                          {PRESSURE_MSG}
-                        </p>
-                      )}
+                      <p id={errId} className="cert-err" aria-live="polite">
+                        {bad ? PRESSURE_MSG : ''}
+                      </p>
                     </div>
                   )
                 })}
@@ -345,20 +411,11 @@ export default function Cert() {
             <button type="button" className="btn cert-add" onClick={addRow}>
               항목 직접 추가
             </button>
-          </div>
+          </Group>
 
-          {GROUPS.map((g) => (
-            <fieldset className="card cert-group" key={g.title}>
-              <legend>{g.title}</legend>
-              {g.title === '보내는 사람' && deduction.contractor === 'other' && (
-                <p className="cert-hint">계약자가 다른 사람이면 계약자 이름을 발신인으로 적고, 내 이름은 대리인 칸에 적어 주세요.</p>
-              )}
-              <div className="cert-grid">{g.fields.map(renderField)}</div>
-            </fieldset>
-          ))}
+          {renderGroup(GROUPS[3], 5)}
 
-          <fieldset className="card cert-group">
-            <legend>선택 문단</legend>
+          <Group no={6} title="선택 문단">
             <label className="cert-check">
               <input type="checkbox" checked={optDelay} onChange={(e) => setOptDelay(e.target.checked)} />
               <span>선택 문단: 지연손해금 고지</span>
@@ -367,86 +424,96 @@ export default function Cert() {
               <input type="checkbox" checked={optLegal} onChange={(e) => setOptLegal(e.target.checked)} />
               <span>선택 문단: 법적 절차 고지</span>
             </label>
-          </fieldset>
+          </Group>
         </div>
 
         {/* ── 실시간 미리보기 ── */}
-        <div className="cert-preview-col">
+        <div className="cert-preview-col" id="cert-preview">
           <div className="cert-preview-bar">
-            <span className="badge">실시간 미리보기</span>
-            <button type="button" className="btn primary" disabled={blocked} onClick={() => setModalOpen(true)}>
+            <div className="cert-preview-tags">
+              <span className="badge">실시간 미리보기</span>
+              <span className="badge ok">AI 미사용</span>
+            </div>
+            <button ref={openerRef} type="button" className="btn primary" disabled={blocked} onClick={() => setModalOpen(true)}>
               PDF 받기
             </button>
           </div>
-          {blocked && <p className="cert-err">{PRESSURE_MSG} 해당 칸을 고치면 PDF를 받을 수 있어요.</p>}
+          {blocked && (
+            <div className="cert-block">
+              <p>{PRESSURE_MSG} 해당 칸을 고치면 PDF를 받을 수 있어요.</p>
+              <p className="small">고칠 칸: {blockedNames.join(', ')}</p>
+            </div>
+          )}
 
-          <article id="cert-print" className="cert-paper" aria-label="내용증명 미리보기">
-            <h2 className="cert-title">임대차보증금 반환 및 공제 근거 요청</h2>
+          <div className="cert-desk">
+            <article id="cert-print" className="cert-paper" aria-label="내용증명 미리보기">
+              <h2 className="cert-title">임대차보증금 반환 및 공제 근거 요청</h2>
 
-            <dl className="cert-parties">
-              <div>
-                <dt>수신</dt>
-                <dd>
-                  임대인 {v('landlordName')} / {v('landlordAddr')}
-                </dd>
-              </div>
-              <div>
-                <dt>발신</dt>
-                <dd>
-                  임차인 {tenant}
-                  {agent ? ` (대리인 ${agent})` : ''} / {v('senderAddr')} / {v('phone')}
-                </dd>
-              </div>
-            </dl>
+              <dl className="cert-parties">
+                <div>
+                  <dt>수신</dt>
+                  <dd>
+                    임대인 {v('landlordName')} / {v('landlordAddr')}
+                  </dd>
+                </div>
+                <div>
+                  <dt>발신</dt>
+                  <dd>
+                    임차인 {tenant}
+                    {agent ? ` (대리인 ${agent})` : ''} / {v('senderAddr')} / {v('phone')}
+                  </dd>
+                </div>
+              </dl>
 
-            <ol className="cert-body">
-              <li>
-                <span className="cert-no">1.</span> 임대차 목적물: {v('propertyAddr')}
-              </li>
-              <li>
-                <span className="cert-no">2.</span> 계약 기간: {dateText(form.startDate)} ~ {dateText(form.endDate)} / 보증금:{' '}
-                {moneyText(form.deposit)}원
-              </li>
-              <li>
-                <span className="cert-no">3.</span> 목적물 반환일(열쇠 반납일): {dateText(form.returnDate)}
-              </li>
-              <li>
-                <span className="cert-no">4.</span> 귀하가 {dateText(form.noticeDate)}에 알려 주신 공제 내역 중 아래 항목의 공제 근거(사진,
-                견적서, 영수증 등)를 {dateText(form.replyDue)}까지 알려 주시기 바랍니다.
-                <ul className="cert-item-lines">
-                  {previewItems.length > 0 ? (
-                    previewItems.map((it) => (
-                      <li key={it.key}>
-                        - {it.name} {it.amount}원
-                      </li>
-                    ))
-                  ) : (
-                    <li>
-                      - {BLANK} {BLANK}원
-                    </li>
-                  )}
-                </ul>
-              </li>
-              <li>
-                <span className="cert-no">5.</span> 위 항목을 제외한 보증금 {moneyText(form.refundAmount)}원은 {dateText(form.replyDue)}까지
-                아래 계좌로 반환해 주시기 바랍니다.
-                <p className="cert-account">
-                  {v('bank')} {v('account')} {v('holder')}
-                </p>
-              </li>
-              {optional.map((text, i) => (
-                <li key={text}>
-                  <span className="cert-no">{6 + i}.</span> {text}
+              <ol className="cert-body">
+                <li>
+                  <span className="cert-no">1.</span> 임대차 목적물: {v('propertyAddr')}
                 </li>
-              ))}
-            </ol>
+                <li>
+                  <span className="cert-no">2.</span> 계약 기간: {dateNode(form.startDate)} ~ {dateNode(form.endDate)} / 보증금:{' '}
+                  {moneyNode(form.deposit)}원
+                </li>
+                <li>
+                  <span className="cert-no">3.</span> 목적물 반환일(열쇠 반납일): {dateNode(form.returnDate)}
+                </li>
+                <li>
+                  <span className="cert-no">4.</span> 귀하가 {dateNode(form.noticeDate)}에 알려 주신 공제 내역 중 아래 항목의 공제 근거(사진,
+                  견적서, 영수증 등)를 {dateNode(form.replyDue)}까지 알려 주시기 바랍니다.
+                  <ul className="cert-item-lines">
+                    {previewItems.length > 0 ? (
+                      previewItems.map((it) => (
+                        <li key={it.key}>
+                          - {it.name} {it.amount}원
+                        </li>
+                      ))
+                    ) : (
+                      <li>
+                        - <Blank /> <Blank />원
+                      </li>
+                    )}
+                  </ul>
+                </li>
+                <li>
+                  <span className="cert-no">5.</span> 위 항목을 제외한 보증금 {moneyNode(form.refundAmount)}원은 {dateNode(form.replyDue)}까지
+                  아래 계좌로 반환해 주시기 바랍니다.
+                  <p className="cert-account">
+                    {v('bank')} {v('account')} {v('holder')}
+                  </p>
+                </li>
+                {optional.map((text, i) => (
+                  <li key={text}>
+                    <span className="cert-no">{6 + i}.</span> {text}
+                  </li>
+                ))}
+              </ol>
 
-            <p className="cert-date">{dateText(form.writtenDate)}</p>
-            <p className="cert-sign">
-              발신인 {tenant}
-              {agent ? ` 대리인 ${agent}` : ''} (서명)
-            </p>
-          </article>
+              <p className="cert-date">{dateNode(form.writtenDate)}</p>
+              <p className="cert-sign">
+                발신인 {tenant}
+                {agent ? ` 대리인 ${agent}` : ''} (서명)
+              </p>
+            </article>
+          </div>
           <p className="muted small cert-note">
             보증금 지킴이는 입력하신 내용을 서식에 채워 넣을 뿐, 내용이 맞는지 판단하지 않아요. 보내기 전에 날짜·금액·계좌를 다시 확인해 주세요.
           </p>
@@ -481,7 +548,7 @@ export default function Cert() {
             <a href="https://legalcc.kookmin.ac.kr" target="_blank" rel="noreferrer">
               국민대 법률상담센터
             </a>{' '}
-            <span className="muted small">(법학관 233호, 평일 10:00~16:00)</span>
+            <span className="muted small">(법학관 1층 105호, 평일 10:00~16:00 · 방문 전 전화 확인 02-910-6397)</span>
           </li>
           <li>
             <a href="https://www.koreanbar.or.kr" target="_blank" rel="noreferrer">
@@ -493,7 +560,7 @@ export default function Cert() {
       </footer>
 
       {modalOpen && (
-        <div className="modal-backdrop" role="presentation" onClick={() => setModalOpen(false)}>
+        <div className="modal-backdrop" role="presentation" onClick={closeModal}>
           <div
             className="modal cert-modal"
             role="dialog"
@@ -508,10 +575,10 @@ export default function Cert() {
             </p>
             <p className="muted small">인쇄 창에서 "PDF로 저장"을 고르면 파일로 저장돼요.</p>
             <div className="cert-modal-actions">
-              <button type="button" className="btn primary" onClick={printCert}>
+              <button ref={modalBtnRef} type="button" className="btn primary" onClick={printCert}>
                 데모로 받기
               </button>
-              <button type="button" className="btn" onClick={() => setModalOpen(false)}>
+              <button type="button" className="btn" onClick={closeModal}>
                 닫기
               </button>
             </div>

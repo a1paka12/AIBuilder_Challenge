@@ -1,14 +1,47 @@
+import { useEffect, useRef, type ReactNode } from 'react'
 import { StoreProvider } from './state'
-import { go, useRoute } from './router'
+import { documentTitle, hrefOf, useRoute, type Route } from './router'
 import Home from './screens/Home'
 import Deduct from './screens/Deduct'
 import Record from './screens/Record'
 import Cert from './screens/Cert'
 import Pricing from './screens/Pricing'
 import Privacy from './screens/Privacy'
+import Event from './screens/Event'
+import Help from './screens/Help'
+import Lawyers from './screens/Lawyers'
+import PromoPopup from './components/PromoPopup'
+import FooterCompliance from './components/FooterCompliance'
+import { COMPANY } from './data/company'
+import './styles/shell.css'
+
+/* ── 화면 전환 ───────────────────────────────────────────────────────── */
 
 function Screen() {
   const { route, query } = useRoute()
+  const prevRoute = useRef<Route | null>(null)
+
+  /*
+   * 화면이 바뀌면 ① 문서 제목을 바꾸고 ② 첫 로드가 아니면 새 화면의 h1(없으면 본문)으로 포커스를 옮긴다.
+   * 해시 라우팅은 페이지를 새로 읽지 않아 화면낭독기가 제목·포커스를 그대로 두기 때문이다.
+   * 스크롤은 라우터가 hashchange 때 이미 맨 위로 올렸으므로 포커스는 스크롤을 건드리지 않는다.
+   */
+  useEffect(() => {
+    document.title = documentTitle(route)
+    const moved = prevRoute.current !== null && prevRoute.current !== route
+    prevRoute.current = route
+    if (!moved) return
+    const main = document.getElementById('main')
+    if (!main) return
+    const h1 = main.querySelector('h1')
+    if (h1) {
+      if (!h1.hasAttribute('tabindex')) h1.tabIndex = -1
+      h1.focus({ preventScroll: true })
+    } else {
+      main.focus({ preventScroll: true })
+    }
+  }, [route])
+
   switch (route) {
     case 'deduct':
       return <Deduct sample={query.get('sample') === '1'} />
@@ -20,10 +53,18 @@ function Screen() {
       return <Pricing />
     case 'privacy':
       return <Privacy />
+    case 'event':
+      return <Event />
+    case 'help':
+      return <Help />
+    case 'lawyer':
+      return <Lawyers />
     default:
       return <Home />
   }
 }
+
+/* ── 선 아이콘 (장식, aria-hidden). 로고·문장·도장 모양은 쓰지 않는다 ─────────── */
 
 /* 단순한 선 집 아이콘 (기관 로고·문장처럼 보이지 않게 선만 사용) */
 function HouseMark({ size = 26 }: { size?: number }) {
@@ -48,69 +89,257 @@ function HouseMark({ size = 26 }: { size?: number }) {
   )
 }
 
+function LineIcon({ size = 16, className, children }: { size?: number; className?: string; children: ReactNode }) {
+  return (
+    <svg
+      className={className}
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      {children}
+    </svg>
+  )
+}
+
+/* 선물 상자 (출시 기념 이벤트) */
+const IconGift = () => (
+  <LineIcon size={16}>
+    <path d="M4 11h16v9H4z" />
+    <path d="M3 7h18v4H3z" />
+    <path d="M12 7v13" />
+    <path d="M12 7c-1.5-3-5-3-5-1s3 1 5 1zM12 7c1.5-3 5-3 5-1s-3 1-5 1z" />
+  </LineIcon>
+)
+
+/* 오른쪽 꺾쇠 */
+const IconChevron = ({ className }: { className?: string }) => (
+  <LineIcon size={14} className={className}>
+    <path d="M9 5l7 7-7 7" />
+  </LineIcon>
+)
+
+/* 새 창(외부 링크) */
+const IconExternal = ({ className }: { className?: string }) => (
+  <LineIcon size={14} className={className}>
+    <path d="M14 4h6v6" />
+    <path d="M20 4l-9.5 9.5" />
+    <path d="M19 13.5V19a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5.5" />
+  </LineIcon>
+)
+
+/* 말풍선 (온라인 문의) */
+const IconChat = () => (
+  <LineIcon size={18}>
+    <path d="M4 5h16v11h-9l-4.5 3.5V16H4z" />
+    <path d="M8 9.5h8M8 12.5h5" />
+  </LineIcon>
+)
+
+/* ── 상단: 유틸리티 띠 + GNB ─────────────────────────────────────────── */
+
+const MENU: { route: Route; label: string }[] = [
+  { route: 'deduct', label: '공제 정리' },
+  { route: 'record', label: '방 상태 기록' },
+  { route: 'lawyer', label: '변호사 찾아보기' },
+  { route: 'help', label: '상담 기관' },
+  { route: 'cert', label: '내용증명' },
+  { route: 'pricing', label: '가격 안내' },
+]
+
+/** 메뉴 줄이 넘칠 때(좁은 화면) 양끝 흐림 표시용 — 스크롤 위치를 data-edge 로 적는다 */
+function markEdges(nav: HTMLElement, wrap: HTMLElement) {
+  const max = nav.scrollWidth - nav.clientWidth
+  let edge = 'none'
+  if (max > 1) edge = nav.scrollLeft <= 1 ? 'start' : nav.scrollLeft >= max - 1 ? 'end' : 'mid'
+  wrap.dataset.edge = edge
+}
+
 function Header() {
   const { route } = useRoute()
-  const current = (r: string) => (route === r ? 'page' : undefined)
+  const current = (r: Route) => (route === r ? 'page' : undefined)
+  const navRef = useRef<HTMLElement>(null)
+  const wrapRef = useRef<HTMLDivElement>(null)
+
+  // 넘침 여부는 창 크기·글꼴 로딩에 따라 달라진다
+  useEffect(() => {
+    const refresh = () => {
+      const nav = navRef.current
+      const wrap = wrapRef.current
+      if (nav && wrap) markEdges(nav, wrap)
+    }
+    refresh()
+    window.addEventListener('resize', refresh)
+    document.fonts?.ready.then(refresh, () => {})
+    return () => window.removeEventListener('resize', refresh)
+  }, [])
+
+  // 메뉴가 스크롤될 때는 현재 화면 항목이 보이도록 가운데로 옮긴다
+  useEffect(() => {
+    const nav = navRef.current
+    if (!nav || nav.scrollWidth - nav.clientWidth <= 1) return
+    const el = nav.querySelector<HTMLElement>('[aria-current="page"]')
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    const nr = nav.getBoundingClientRect()
+    const left = nav.scrollLeft + (r.left - nr.left) - (nr.width - r.width) / 2
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    nav.scrollTo({ left: Math.max(0, left), behavior: reduce ? 'auto' : 'smooth' })
+  }, [route])
+
   return (
     <>
       <div className="utility-bar">
         <div className="container utility-inner">
-          <p>민간 학생 팀 서비스 · 국민대 AI 빌더 챌린지 2026 출품작</p>
+          <a className="utility-event" href={hrefOf('event')} aria-current={current('event')}>
+            <IconGift />
+            <span>출시 기념 이벤트</span>
+            <IconChevron className="utility-chev" />
+          </a>
+          <p className="utility-note">
+            민간 학생 팀 서비스
+            <span className="utility-note-more"> · 정부·공공기관 서비스가 아니에요</span>
+          </p>
         </div>
       </div>
       <header className="topbar">
         <div className="container topbar-inner">
-          <button type="button" className="brand" onClick={() => go('home')}>
+          <a className="brand" href={hrefOf('home')} aria-current={current('home')}>
             <HouseMark />
             <span className="brand-name">보증금 지킴이</span>
-          </button>
-          <nav className="topnav" aria-label="주 메뉴">
-            <button type="button" aria-current={current('deduct')} onClick={() => go('deduct')}>공제 정리</button>
-            <button type="button" aria-current={current('record')} onClick={() => go('record')}>방 상태 기록</button>
-            <button type="button" aria-current={current('pricing')} onClick={() => go('pricing')}>가격</button>
-          </nav>
+          </a>
+          <div className="topnav-wrap" ref={wrapRef}>
+            <nav
+              className="topnav"
+              aria-label="주 메뉴"
+              ref={navRef}
+              onScroll={(e) => {
+                if (wrapRef.current) markEdges(e.currentTarget, wrapRef.current)
+              }}
+            >
+              {MENU.map((m) => (
+                <a key={m.route} href={hrefOf(m.route)} aria-current={current(m.route)}>
+                  {m.label}
+                </a>
+              ))}
+            </nav>
+          </div>
         </div>
       </header>
     </>
   )
 }
 
+/* ── 바닥글: 링크 줄 · 고객센터 · 사업자 정보 · 고지 · 준수 표시 · 저작권 ───────── */
+
+/* 사업자 정보 — src/data/company.ts 의 값을 그대로 보여 준다(지어낸 번호 없음) */
+const BIZ_ROWS: { label: string; value: string; note?: string }[] = [
+  { label: '서비스명', value: COMPANY.serviceName },
+  { label: '운영', value: COMPANY.operator, note: COMPANY.operatorNote },
+  { label: '주소', value: COMPANY.address, note: COMPANY.addressNote },
+  { label: '사업자등록', value: COMPANY.bizReg },
+  { label: '통신판매업', value: COMPANY.mailOrder },
+  { label: '호스팅', value: COMPANY.hosting },
+  { label: '개인정보 보호 담당', value: COMPANY.privacyOfficer },
+]
+
 function Footer() {
+  const { route } = useRoute()
+  const current = (r: Route) => (route === r ? 'page' : undefined)
   return (
     <footer className="footer">
       <div className="container">
+        <nav className="footer-links" aria-label="바닥글 메뉴">
+          <ul>
+            <li>
+              <a className="footer-privacy" href={hrefOf('privacy')} aria-current={current('privacy')}>
+                개인정보 처리방침
+              </a>
+            </li>
+            <li>
+              <a href={hrefOf('event')} aria-current={current('event')}>
+                이벤트
+              </a>
+            </li>
+            <li>
+              <a href={hrefOf('help')} aria-current={current('help')}>
+                상담 기관 안내
+              </a>
+            </li>
+            <li>
+              <a href={COMPANY.repoUrl} target="_blank" rel="noopener noreferrer">
+                GitHub 저장소<span className="shell-sr"> (새 창)</span>
+                <IconExternal className="footer-ext" />
+              </a>
+            </li>
+          </ul>
+        </nav>
+
         <div className="footer-grid">
           <div className="footer-about">
             <p className="footer-brand">
               <HouseMark size={22} />
               보증금 지킴이
             </p>
-            <p>퇴실 공제 통보를 받은 자취생을 위한 공제 내역 정리·근거 문의·방 상태 기록 서비스</p>
+            <p className="footer-desc">퇴실 공제 통보를 받은 자취생을 위한 공제 내역 정리·근거 문의·방 상태 기록 서비스</p>
           </div>
-          <nav className="footer-links" aria-label="바닥글 메뉴">
-            <h2 className="footer-title">바로가기</h2>
-            <ul>
-              <li>
-                <button type="button" className="linklike footer-privacy" onClick={() => go('privacy')}>개인정보 처리방침</button>
-              </li>
-              <li>
-                <button type="button" className="linklike" onClick={() => go('pricing')}>가격 안내</button>
-              </li>
-              <li>
-                <a href="/slides/" target="_blank" rel="noopener noreferrer">발표자료</a>
-              </li>
-            </ul>
-          </nav>
+
+          <section className="footer-cs" aria-labelledby="footer-cs-title">
+            <h2 id="footer-cs-title" className="footer-cs-title">
+              고객센터
+            </h2>
+            <a className="footer-cs-link" href={COMPANY.contactUrl} target="_blank" rel="noopener noreferrer">
+              <IconChat />
+              <span>
+                {COMPANY.contactLabel}
+                <span className="shell-sr"> (새 창)</span>
+              </span>
+              <IconExternal className="footer-ext" />
+            </a>
+            <p className="footer-cs-note">{COMPANY.contactNote}</p>
+          </section>
         </div>
+
+        <section className="footer-biz-sec" aria-labelledby="footer-biz-title">
+          <h2 id="footer-biz-title" className="footer-biz-title">
+            사업자 정보
+          </h2>
+          <dl className="footer-biz">
+            {BIZ_ROWS.map((r) => (
+              <div key={r.label}>
+                <dt>{r.label}</dt>
+                <dd>
+                  {r.value}
+                  {r.note && <span className="footer-biz-note">{r.note}</span>}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+
         <div className="footer-legal">
-          <p>보증금 지킴이는 공개 자료를 찾아 보여 주는 정보 제공 도구이며, 법률 판단이나 대리를 하지 않습니다.</p>
-          <p>보증금 지킴이는 민간 학생 팀의 서비스이며 정부·공공기관 서비스가 아니고, ISMS-P 등 인증을 받지 않았습니다.</p>
-          <p className="footer-copy">© 2026 보증금 지킴이 · 국민대 AI 빌더 챌린지 2026 출품작</p>
+          <p>보증금 지킴이는 공개 자료를 찾아 보여 주는 정보 제공 도구이며, 법률 판단이나 대리를 하지 않아요.</p>
+          <p>
+            보증금 지킴이는 민간 학생 팀의 서비스이며 정부·공공기관 서비스가 아니고, 정보보호 관련 인증을 받지 않았어요. AI는 공제 내역을 정리만
+            하고 법률 판단은 하지 않아요.
+          </p>
         </div>
+
+        <FooterCompliance />
+        <p className="footer-copy">© 2026 보증금 지킴이 팀 · KOOKMIN AI BUILDER CHALLENGE 2026 출품작</p>
       </div>
     </footer>
   )
 }
+
+/* ── 앱 ─────────────────────────────────────────────────────────────── */
 
 export default function App() {
   return (
@@ -133,6 +362,8 @@ export default function App() {
         </main>
         <Footer />
       </div>
+      {/* 첫 화면 레이어 팝업 — 포털이라 위치 무관, 한 번만 마운트 */}
+      <PromoPopup />
     </StoreProvider>
   )
 }

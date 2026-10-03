@@ -1,0 +1,165 @@
+/*
+ * 바닥글 "준수·점검 표시" 줄 (FooterCompliance.tsx)
+ * 어두운 바닥글(--footer-bg #252a32) 위 대비:
+ *   흰 글자 14.4:1 · --footer-text #c3c9d2 8.7:1 · 링크 #8fb6ff 7.1:1 · 보조 #a3abb6 6.2:1 · 아이콘 #9dbcf0 7.5:1
+ * 인증 도장·방패처럼 보이지 않게 아이콘에 테두리·원형 배경을 두지 않는다.
+ */
+.fc {
+  --fc-bg: var(--footer-bg, #252a32);
+  --fc-text: var(--footer-text, #c3c9d2);
+  --fc-strong: #ffffff;
+  --fc-sub: #a3abb6;
+  --fc-link: #8fb6ff;
+  --fc-icon: #9dbcf0;
+  --fc-divider: rgba(255, 255, 255, 0.14);
+
+  margin: 16px 0 0;
+  padding: 16px 0 0;
+  border-top: 1px solid var(--fc-divider);
+  color: var(--fc-text);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.fc-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 12px;
+  margin: 0 0 12px;
+}
+.fc .fc-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+  color: var(--fc-strong);
+}
+.fc .fc-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--fc-sub);
+}
+
+/* 한 줄로 늘어선 항목 — 넓은 화면 5칸, 사이에 세로 구분선 */
+.fc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.fc-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  padding: 2px 16px;
+  border-left: 1px solid var(--fc-divider);
+}
+.fc-item:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+.fc-item:last-child {
+  padding-right: 0;
+}
+
+.fc-icon-wrap {
+  display: inline-flex;
+  flex: none;
+  padding-top: 1px;
+  color: var(--fc-icon);
+}
+.fc-icon {
+  display: block;
+}
+
+.fc-text {
+  min-width: 0;
+}
+.fc .fc-item-title {
+  display: block;
+  margin: 0 0 2px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+  color: var(--fc-strong);
+}
+.fc .fc-desc {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--fc-text);
+}
+
+/* 어두운 배경용 링크 버튼 — 글자 크기는 그대로, 누르는 영역만 44px */
+.fc .fc-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin: -12px 0;
+  padding: 0 2px;
+  color: var(--fc-link);
+  font-weight: 700;
+  font-size: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 0.12s;
+}
+.fc .fc-link:hover {
+  color: #ffffff;
+}
+.fc :focus-visible {
+  outline: 3px solid #ffffff;
+  outline-offset: 2px;
+  border-radius: var(--radius-sm, 4px);
+}
+
+.fc .fc-font {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: var(--fc-sub);
+}
+
+/* 중간 폭: 2칸 */
+@media (max-width: 960px) {
+  .fc-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 0;
+  }
+  .fc-item,
+  .fc-item:first-child,
+  .fc-item:last-child {
+    padding: 2px 16px 2px 0;
+    border-left: 0;
+  }
+}
+
+/* 휴대폰(390px 기준): 1칸, 항목 사이 가는 선 */
+@media (max-width: 560px) {
+  .fc-list {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+  .fc-item,
+  .fc-item:first-child,
+  .fc-item:last-child {
+    padding: 10px 0;
+    border-top: 1px solid var(--fc-divider);
+  }
+  .fc-item:first-child {
+    border-top: 0;
+    padding-top: 0;
+  }
+  .fc .fc-desc {
+    font-size: 13px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fc .fc-link {
+    transition: none;
+  }
+}

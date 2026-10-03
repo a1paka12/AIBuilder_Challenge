@@ -26,7 +26,12 @@ export type Contractor = 'self' | 'other' | 'unknown'
 export type ExtractSource = 'ai' | 'cache' | 'manual'
 
 export interface DeductionState {
+  /** 사용자가 붙여 넣은 원문 — 이 기기(브라우저 메모리)에서만 쓴다 */
   rawText: string
+  /** 서버로 보낸 처리본(전송본): 기기 내 개인정보 제거를 거친 글. 직접 입력이면 없음 */
+  processedText?: string
+  /** 가린 항목 요약("전화번호 1 · 계좌번호 1"), 가린 것이 없으면 '' */
+  maskSummary?: string
   items: Item[]
   statedTotal: number | null
   source: ExtractSource | null
@@ -80,4 +85,8 @@ export interface RoomPhoto {
   date: string | null
   dateSource: DateSource
   receipt: ReceiptResponse | null
+  /** 개인정보 가림 처리본인지 — 브라우저 canvas 재인코딩으로 메타데이터(EXIF·GPS)가 제거된 새 파일 (PRD FR-01). url·sha256 은 처리본 기준 */
+  masked?: boolean
+  /** 가림 상자 수 */
+  maskCount?: number
 }

@@ -4,6 +4,7 @@ import { won } from '../../api'
 import { clauseMatchesItem } from '../../data/references'
 import type { Item } from '../../types'
 import RefCards from './RefCards'
+import { IconChevronDown } from './icons'
 import { newManualItem, parseAmount } from './newItem'
 
 interface Props {
@@ -11,9 +12,12 @@ interface Props {
   setEditingId: (id: string | null) => void
 }
 
-/** 붙여 넣은 원문에서 인용 부분을 <mark>로 강조 */
+/** 행마다 반복되는 버튼·체크박스 이름에 넣을 항목 이름 */
+const itemLabel = (it: Item) => it.name.trim() || '이름 없는 항목'
+
+/** AI가 본 전송본(처리본)에서 인용 부분을 <mark>로 강조 — 인용은 처리본 기준으로 찾는다 */
 function Highlighted({ text, quote }: { text: string; quote: string }) {
-  if (!text) return <p className="small muted">붙여 넣은 원문이 없어요.</p>
+  if (!text) return <p className="small muted">대조할 글이 없어요.</p>
   const q = quote.trim()
   let idx = q ? text.indexOf(q) : -1
   let len = q.length
@@ -43,10 +47,17 @@ function QuoteCell({ item }: { item: Item }) {
   if (!item.quote) return <span className="small muted">{item.manual ? '직접 추가한 항목' : '-'}</span>
   return (
     <span className="dd-quote">
-      <span>“{item.quote}”</span>
+      <span className="dd-quote-text">“{item.quote}”</span>
       {!item.quoteFound && <span className="badge warn">원문 확인 필요</span>}
     </span>
   )
+}
+
+/** 카드 왼쪽 띠 색: 확인함=초록, 확인 필요(AI 표시·원문 못 찾음)=주황 */
+function rowTone(it: Item): string {
+  if (it.confirmed) return ' is-ok'
+  if (it.needsCheck || (it.quote !== '' && !it.quoteFound)) return ' is-warn'
+  return ''
 }
 
 function EditRow({
@@ -62,6 +73,7 @@ function EditRow({
   const [amount, setAmount] = useState(item.amount === null ? '' : String(item.amount))
   const [error, setError] = useState<string | null>(null)
   const parsed = parseAmount(amount)
+  const label = item.manual && !item.name ? '새 항목' : itemLabel(item)
 
   const save = () => {
     const n = name.trim()
@@ -82,7 +94,7 @@ function EditRow({
 
   return (
     <tr className="dd-row editing">
-      <td data-label="항목">
+      <td data-label="항목" className="dd-td-name">
         <input
           className="dd-input"
           aria-label="항목 이름"
@@ -97,7 +109,7 @@ function EditRow({
           onKeyDown={onKey}
         />
       </td>
-      <td data-label="청구액">
+      <td data-label="청구액" className="dd-td-amount">
         <input
           className="dd-input dd-amount-input"
           aria-label="청구액(원)"
@@ -114,10 +126,10 @@ function EditRow({
           {parsed.ok ? (parsed.value === null ? '비우면 금액 미정' : won(parsed.value)) : ''}
         </span>
       </td>
-      <td data-label="원문">
+      <td data-label="원문" className="dd-td-quote">
         <QuoteCell item={item} />
       </td>
-      <td data-label="상태">
+      <td data-label="상태" className="dd-td-status">
         {error ? (
           <span className="dd-error small" role="alert">
             {error}
@@ -126,20 +138,20 @@ function EditRow({
           <span className="small muted">수정 중</span>
         )}
       </td>
-      <td data-label="버튼">
+      <td data-label="버튼" className="dd-td-actions">
         <div className="dd-actions">
-          <button type="button" className="btn primary dd-btn" onClick={save}>
+          <button type="button" className="btn primary dd-btn" aria-label={`${label} 저장`} onClick={save}>
             저장
           </button>
-          <button type="button" className="btn dd-btn" onClick={onCancel}>
+          <button type="button" className="btn dd-btn" aria-label={`${label} 수정 취소`} onClick={onCancel}>
             취소
           </button>
         </div>
       </td>
-      <td data-label="물어볼 항목">
+      <td data-label="물어볼 항목" className="dd-td-check">
         <label className="dd-check disabled" title="먼저 확인해 주세요">
-          <input type="checkbox" checked={false} disabled readOnly />
-          물어볼 항목
+          <input type="checkbox" checked={false} disabled readOnly aria-label={`${label} 물어볼 항목`} />
+          <span className="dd-check-text">물어볼 항목</span>
         </label>
       </td>
     </tr>
@@ -148,7 +160,10 @@ function EditRow({
 
 export default function ItemTable({ editingId, setEditingId }: Props) {
   const { deduction, setDeduction, updateItem } = useStore()
-  const { items, rawText, clauseText } = deduction
+  const { items, rawText, processedText, clauseText } = deduction
+  // 원문 대조는 AI가 실제로 본 처리본(전송본) 기준 — 인용이 처리본에서 찾아진다. 직접 입력(처리본 없음)이면 붙여 넣은 글
+  const sourceText = processedText ?? rawText
+  const sourceTitle = processedText !== undefined ? 'AI가 본 전송본(처리본)' : '붙여 넣은 원문'
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [notice, setNotice] = useState<Record<string, string>>({})
 
@@ -213,7 +228,7 @@ export default function ItemTable({ editingId, setEditingId }: Props) {
         <thead>
           <tr>
             <th scope="col">항목</th>
-            <th scope="col">청구액</th>
+            <th scope="col" className="dd-th-amount">청구액</th>
             <th scope="col">원문</th>
             <th scope="col">상태</th>
             <th scope="col">버튼</th>
@@ -230,6 +245,7 @@ export default function ItemTable({ editingId, setEditingId }: Props) {
             const expanded = expandedId === it.id
             const clauseHit = clauseMatchesItem(clauseText, it.name)
             const canSelect = it.confirmed && it.amount !== null
+            const label = itemLabel(it)
             return (
               <Fragment key={it.id}>
                 {editingId === it.id ? (
@@ -239,27 +255,25 @@ export default function ItemTable({ editingId, setEditingId }: Props) {
                     onCancel={() => cancelEdit(it)}
                   />
                 ) : (
-                  <tr className={`dd-row${it.selected ? ' selected' : ''}${expanded ? ' expanded' : ''}`}>
-                    <td data-label="항목">
+                  <tr className={`dd-row${rowTone(it)}${it.selected ? ' selected' : ''}${expanded ? ' expanded' : ''}`}>
+                    <td data-label="항목" className="dd-td-name">
                       <button
                         type="button"
                         className="dd-name"
                         aria-expanded={expanded}
                         onClick={() => setExpandedId(expanded ? null : it.id)}
                       >
-                        <span>{it.name || '(이름 없음)'}</span>
-                        <span className="dd-caret" aria-hidden="true">
-                          {expanded ? '▲' : '▼'}
-                        </span>
+                        <span className="dd-name-text">{it.name || '(이름 없음)'}</span>
+                        <IconChevronDown size={14} className={`dd-caret${expanded ? ' open' : ''}`} />
                       </button>
                     </td>
-                    <td data-label="청구액" className="dd-amount">
-                      {it.amount === null ? <span className="muted small">금액 미정</span> : won(it.amount)}
+                    <td data-label="청구액" className="dd-td-amount dd-amount">
+                      {it.amount === null ? <span className="muted small dd-amount-none">금액 미정</span> : won(it.amount)}
                     </td>
-                    <td data-label="원문">
+                    <td data-label="원문" className="dd-td-quote">
                       <QuoteCell item={it} />
                     </td>
-                    <td data-label="상태">
+                    <td data-label="상태" className="dd-td-status">
                       <div className="dd-status">
                         {it.confirmed ? (
                           <span className="badge ok">확인함</span>
@@ -271,23 +285,28 @@ export default function ItemTable({ editingId, setEditingId }: Props) {
                         ) : (
                           <span className="small muted">확인 전</span>
                         )}
-                        {clauseHit && <span className="badge warn">특약 있음 · 상담 필요</span>}
+                        {clauseHit && (
+                          <span className="badge" title="특약 문구에 이 항목과 같은 말이 있어요. 효력·적용 여부는 판단하지 않아요.">
+                            특약: 관련 문구 있음
+                          </span>
+                        )}
                       </div>
                     </td>
-                    <td data-label="버튼">
+                    <td data-label="버튼" className="dd-td-actions">
                       <div className="dd-actions">
-                        <button type="button" className="btn dd-btn" onClick={() => setEditingId(it.id)}>
+                        <button type="button" className="btn dd-btn" aria-label={`${label} 수정`} onClick={() => setEditingId(it.id)}>
                           수정
                         </button>
                         <button
                           type="button"
                           className={it.confirmed ? 'btn dd-btn' : 'btn primary dd-btn'}
                           aria-pressed={it.confirmed}
+                          aria-label={`${label} ${it.confirmed ? '확인 취소' : '확인'}`}
                           onClick={() => confirmToggle(it)}
                         >
                           {it.confirmed ? '확인 취소' : '확인'}
                         </button>
-                        <button type="button" className="btn ghost dd-btn dd-del" onClick={() => remove(it.id)}>
+                        <button type="button" className="btn ghost dd-btn dd-del" aria-label={`${label} 삭제`} onClick={() => remove(it.id)}>
                           삭제
                         </button>
                       </div>
@@ -297,7 +316,7 @@ export default function ItemTable({ editingId, setEditingId }: Props) {
                         </p>
                       )}
                     </td>
-                    <td data-label="물어볼 항목">
+                    <td data-label="물어볼 항목" className="dd-td-check">
                       <label
                         className={`dd-check${canSelect ? '' : ' disabled'}`}
                         title={canSelect ? undefined : '먼저 확인해 주세요'}
@@ -306,10 +325,11 @@ export default function ItemTable({ editingId, setEditingId }: Props) {
                           type="checkbox"
                           checked={it.selected}
                           disabled={!canSelect}
+                          aria-label={`${label} 물어볼 항목`}
                           title={canSelect ? undefined : '먼저 확인해 주세요'}
                           onChange={(e) => updateItem(it.id, { selected: e.target.checked })}
                         />
-                        물어볼 항목
+                        <span className="dd-check-text">물어볼 항목</span>
                       </label>
                     </td>
                   </tr>
@@ -319,10 +339,13 @@ export default function ItemTable({ editingId, setEditingId }: Props) {
                     <td colSpan={6}>
                       <div className="dd-expand-inner">
                         <div className="dd-source">
-                          <h4 className="dd-subhead">붙여 넣은 원문</h4>
-                          <Highlighted text={rawText} quote={it.quote} />
+                          <h4 className="dd-subhead">{sourceTitle}</h4>
+                          <Highlighted text={sourceText} quote={it.quote} />
+                          {processedText !== undefined && (
+                            <p className="small muted">전송본은 이 기기에서 개인정보를 가린 처리본이에요. 가린 자리는 [전화번호 삭제]처럼 보여요.</p>
+                          )}
                           {it.quote && !it.quoteFound && (
-                            <p className="small muted">원문에서 이 인용을 찾지 못했어요. 원문을 직접 확인해 주세요.</p>
+                            <p className="small muted">전송본에서 이 인용을 찾지 못했어요. 원문을 직접 확인해 주세요.</p>
                           )}
                         </div>
                         <RefCards itemName={it.name} />

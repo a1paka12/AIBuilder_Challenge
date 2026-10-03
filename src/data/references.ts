@@ -41,7 +41,7 @@ export const REFERENCES: Reference[] = [
     scope: '표준계약서 사용 시',
     caution: false,
     note: '표준계약서를 쓰지 않았다면 이 조항은 내 계약에 없을 수 있어요.',
-    sourceLabel: '법무부·국토교통부 주택임대차표준계약서',
+    sourceLabel: '법무부 주택임대차표준계약서',
     sourceUrl: 'https://www.moj.go.kr/sites/moj/download/20231006_01.pdf',
     checkedAt: REFERENCE_CHECKED_AT,
     keywords: ['도배', '벽지', '장판', '바닥', '노후', '파손', '원상복구', '원상회복', '청소', '시트지', '싱크대'],

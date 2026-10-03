@@ -1,0 +1,208 @@
+/*
+ * 첫 화면 레이어 팝업 — 은행 누리집 첫 화면 안내창 꼴
+ * 흰 카드 · 위 남색 선 · 머리띠(제목 + 닫기 X) · 선 그림 키 비주얼 · 본문 · 이전/다음 · 회색 바닥 바(오늘 하루 보지 않기 / 닫기)
+ * 사진·로고·인증마크 없음. 폭 최대 360px, 화면 높이를 넘지 않게 본문만 스크롤.
+ */
+.promo-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.55);
+  animation: promo-fade 0.2s ease-out both;
+}
+.promo-dialog {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 360px;
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+  background: var(--surface);
+  border-radius: var(--radius);
+  border-top: 4px solid var(--primary);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.28);
+  overflow: hidden;
+  animation: promo-pop 0.22s ease-out both;
+}
+
+/* 머리띠 */
+.promo-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 4px 4px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.promo-head-label { font-size: 13px; font-weight: 700; color: var(--primary-dark); letter-spacing: 0.01em; }
+.promo-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  border-radius: var(--radius-sm);
+  transition: background-color 0.12s, color 0.12s;
+}
+.promo-x:hover { background: var(--bg); color: var(--text); }
+.promo-x:focus-visible { outline-offset: -3px; }
+
+/* 본문 — 패널 하나씩 */
+.promo-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 20px 6px;
+  -webkit-overflow-scrolling: touch;
+}
+.promo-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  animation: promo-panel-in 0.18s ease-out both;
+}
+.promo-visual {
+  width: 100%;
+  margin-bottom: 4px;
+  border: 1px solid #d3e0f1;
+  border-radius: var(--radius);
+  background: var(--primary-soft);
+  color: var(--primary);
+  overflow: hidden;
+}
+.promo-visual svg { display: block; width: 100%; height: auto; }
+.promo-eyebrow { margin: 0; }
+.promo-title {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.3;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+.promo-text { margin: 0; font-size: 16px; line-height: 1.6; color: var(--text); }
+.promo-sub { margin: 0; line-height: 1.6; }
+.promo-count { margin: 2px 0 0; }
+.promo-count b { font-weight: 800; }
+.promo-cta { width: 100%; margin-top: 8px; white-space: normal; text-align: center; line-height: 1.35; }
+
+/* 이전 / 1 / 2 / 다음 */
+.promo-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px 12px 8px;
+}
+.promo-pager-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--primary-dark);
+  transition: background-color 0.12s, border-color 0.12s;
+}
+.promo-pager-btn:hover { background: var(--primary-soft); border-color: var(--primary); }
+.promo-pager-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 88px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.promo-dots { display: inline-flex; gap: 5px; }
+.promo-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--line-strong, #b3bcc8); }
+.promo-dot.is-on { background: var(--primary); }
+
+/* 바닥 바 */
+.promo-foot {
+  display: flex;
+  align-items: stretch;
+  border-top: 1px solid var(--line);
+  background: var(--bg);
+}
+.promo-foot-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-height: 48px;
+  padding: 8px 12px;
+  border: 0;
+  background: none;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  transition: background-color 0.12s, color 0.12s;
+}
+.promo-foot-btn:hover { background: #e6ebf2; color: var(--primary-dark); }
+.promo-foot-btn:focus-visible { outline-offset: -3px; }
+.promo-foot-btn + .promo-foot-btn { flex: 0 0 auto; min-width: 92px; border-left: 1px solid var(--line); }
+.promo-checkbox {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--line-strong, #b3bcc8);
+  border-radius: 3px;
+  background: var(--surface);
+}
+.promo-foot-btn:hover .promo-checkbox { border-color: var(--primary); }
+
+/* 스크린리더 전용 */
+.promo-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes promo-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes promo-pop {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes promo-panel-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (max-width: 420px) {
+  .promo-body { padding: 14px 16px 4px; }
+  .promo-title { font-size: 19px; }
+}
+@media (max-height: 560px) {
+  .promo-visual { display: none; } /* 아주 낮은 화면(가로 모드)에서는 그림을 빼고 글만 */
+}
+@media (prefers-reduced-motion: reduce) {
+  .promo-backdrop, .promo-dialog, .promo-panel { animation: none; }
+  .promo-x, .promo-pager-btn, .promo-foot-btn { transition: none; }
+}
+@media print {
+  .promo-backdrop { display: none !important; }
+}

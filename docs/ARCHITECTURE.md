@@ -1,8 +1,18 @@
 # 보증금 지킴이 아키텍처
 
-작성일: 2026-10-03 · 관련 문서: [PRD](PRD.md) · [API](API.md) · [ERD](ERD.md) · [PRIVACY_LEGAL](PRIVACY_LEGAL.md)
+작성일: 2026-10-03 · 팀 MOTGA · 관련 문서: [PRD](PRD.md) · [화면 설계](SCREENS.md) · [API](API.md) · [ERD](ERD.md) · [개인정보·법적 설계](PRIVACY_LEGAL.md) · [참고 자료](REFERENCES.md) · [테스트 시나리오](TEST_SCENARIOS.md)
 
-배포 URL: https://bojeung.193-123-163-215.sslip.io
+- 배포: https://bojeung.193-123-163-215.sslip.io
+- 저장소: https://github.com/a1paka12/AIBuilder_Challenge
+- 발표자료: https://bojeung.193-123-163-215.sslip.io/slides/
+
+이 문서는 "어떤 데이터가 어디까지 가는가"를 중심으로 구성을 설명한다. 핵심 원칙은 세 가지다.
+
+| 원칙 | 구현 |
+|---|---|
+| 원문은 기기에 | 공제 문자 원문·사진 원본은 브라우저 밖으로 나가지 않는다. 서버에는 가린 처리본(텍스트)과 사진 처리본의 지문(SHA-256)만 간다 |
+| AI는 정리만 | AI는 항목명·청구액·원문 인용·확인 필요 여부만 옮겨 적는다. 공제가 맞는지, 특약이 유효한지, 얼마를 돌려받을지는 판단하지 않는다 |
+| 계산은 결정적으로 | 합계, 참고 자료 매칭, 문의 문자, 내용증명 서식, 변호사 조건 일치 점수는 모두 브라우저의 정해진 코드로 계산한다. 같은 입력이면 같은 결과가 나온다 |
 
 ---
 
@@ -12,193 +22,270 @@
 flowchart LR
     subgraph BR["사용자 브라우저 (휴대폰·PC)"]
         SPA["React 19 SPA<br/>해시 라우팅"]
-        MEM[("메모리 상태<br/>공제 메시지·항목·특약·사진")]
-        WC["Web Crypto<br/>사진 SHA-256 계산"]
-        SPA --- MEM
-        SPA --- WC
+        MASK["텍스트 가림<br/>src/lib/mask.ts"]
+        CANVAS["사진 가림·재인코딩<br/>Canvas + Web Crypto SHA-256<br/>src/lib/imageMask.ts"]
+        MATCH["변호사 조건 일치 계산<br/>src/lib/lawyerMatch.ts"]
+        LS[("localStorage·sessionStorage<br/>무작위 기기 ID·팝업·혜택 표시")]
+        SPA --- MASK
+        SPA --- CANVAS
+        SPA --- MATCH
+        SPA --- LS
     end
 
-    subgraph OCI["Oracle Cloud 서버 (Ubuntu)"]
-        CADDY["Caddy<br/>HTTPS 자동 인증서 (ZeroSSL)"]
-        EXP["Express 4 (Node.js)<br/>127.0.0.1:8420<br/>systemd bojeung.service"]
-        DIST["dist/<br/>빌드된 정적 파일"]
-        RLOG[("server/data/receipts.jsonl<br/>지문 기록, 추가 전용")]
+    subgraph OCI["Oracle Cloud 도쿄 리전 (Ubuntu 22.04)"]
+        CADDY["Caddy 2.11<br/>HTTPS 자동 인증서"]
+        EXP["Express 4 · Node 22<br/>127.0.0.1:8420<br/>systemd bojeung.service"]
+        DIST["dist/<br/>빌드된 화면 + /slides/"]
+        DB[("SQLite server/data/bojeung.db<br/>receipts · intents · survey · metrics")]
         CADDY <-->|"리버스 프록시"| EXP
-        EXP -->|"정적 파일 제공"| DIST
-        EXP -->|"한 줄 추가"| RLOG
+        EXP -->|"정적 파일"| DIST
+        EXP <-->|"node:sqlite"| DB
     end
 
-    OAI["OpenAI API<br/>gpt-5.4-mini<br/>구조화 출력"]
+    OAI["OpenAI API (미국)<br/>gpt-5.4-mini<br/>구조화 출력 JSON Schema strict"]
 
     SPA <-->|"HTTPS"| CADDY
-    EXP <-->|"POST /v1/chat/completions<br/>제한 시간 45초"| OAI
+    EXP <-->|"처리본 텍스트만<br/>제한 시간 45초"| OAI
 ```
 
-- Express는 `127.0.0.1`에만 열려 있어 외부에서 직접 접근할 수 없다. 외부 요청은 Caddy(HTTPS)를 거쳐 들어온다.
-- 하나의 Express 프로세스가 API(`/api/*`)와 빌드된 화면(`dist/`)을 함께 제공한다. `/api/`가 아닌 경로는 `index.html`을 돌려준다(SPA).
-- DB가 없다. 서버에 남는 데이터는 `receipts.jsonl`(사진 지문 기록)뿐이다.
+- Express는 `127.0.0.1`에만 열려 있다. 외부 요청은 모두 Caddy(HTTPS)를 거친다.
+- Express 프로세스 하나가 API(`/api/*`)와 빌드된 화면(`dist/`)을 함께 제공한다. `/api/`가 아닌 주소는 `index.html`을 돌려준다.
+- 서버 DB는 SQLite 파일 하나다(Node 내장 `node:sqlite`). 공제 문자 본문·사진·이름은 저장하지 않는다. 표 구조는 [ERD](ERD.md), 요청·응답은 [API](API.md)에 있다.
+
+| 서버 표 | 들어가는 값 | 들어가지 않는 값 |
+|---|---|---|
+| `receipts` | 사진 처리본의 SHA-256, 서버 수신 시각, HMAC 서명 | 사진, 파일명, 구역·메모 |
+| `intents` | 무작위 기기 ID, 상품(book·cert), 가격 가설, 시각 | 결제 정보(결제 기능 없음) |
+| `survey` | 무작위 기기 ID, 보기 선택값, 시각 | 이름·연락처·자유 입력 |
+| `metrics` | 날짜, 이벤트 이름, 횟수 | 누가 했는지 |
 
 ---
 
-## 2. 요청 흐름
+## 2. FR-01 기기 내 개인정보 제거와 데이터 흐름
 
-### 2-1. 공제 메시지 정리 (`POST /api/extract`)
+### 2-1. 텍스트: 공제 문자 정리 (`POST /api/extract`)
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor U as 사용자
-    participant B as 브라우저 (React)
-    participant C as Caddy
-    participant S as Express
+    participant B as 브라우저
+    participant S as Express (Caddy 경유)
     participant O as OpenAI API
 
-    U->>B: 공제 메시지 붙여 넣고 [정리하기]
-    alt 빈 입력 또는 3,000자 초과
-        B-->>U: AI를 부르지 않고 이유 안내
-    else 입력 정상
-        B->>C: POST /api/extract (text)
-        C->>S: 프록시 전달
-        S->>S: 속도 제한 (IP당 분당 30회)<br/>빈 입력·3,000자 재검사
-        S->>O: 시스템 프롬프트 + 구분자로 감싼 메시지<br/>JSON Schema strict, 45초 제한
-        alt AI 응답 성공
-            O-->>S: items, stated_total (JSON)
-            S->>S: sanitize<br/>금액 범위·원문 대조·개인정보 가림·id 부여
-            S->>S: 로그는 항목 수·처리 시간만 (본문 없음)
-            S-->>B: items, stated_total, source=ai
-            B-->>U: 표 + AI 배지, 애매한 행은 "확인 필요"
-        else AI 오류·지연
-            S-->>B: 502 ai_error / 504 timeout + 안내 메시지
-            B-->>U: 입력은 그대로, [다시 시도]·[직접 입력]
-        end
+    U->>B: 공제 문자 붙여넣기 + 가릴 단어(이름·주소·호수) 추가
+    B->>B: mask.ts 치환<br/>주민등록번호·휴대전화·일반전화·계좌·이메일 패턴 + 추가 단어<br/>→ "[전화번호 삭제]" "[이름 삭제]" 같은 표시로 바꿈
+    B-->>U: "전송본 확인" 패널: 실제 처리본 + 가린 항목 수
+    alt 치환 실패 또는 빈 입력·3,000자 초과
+        B-->>U: 전송 차단, 이유 안내
+    else 사용자가 [이 전송본으로 정리하기]
+        B->>S: POST /api/extract {text: 처리본}
+        S->>S: 속도 제한(IP당 분당 30회), 길이 재검사<br/>maskPII로 한 번 더 가림
+        S->>O: 시스템 프롬프트 + 구분자로 감싼 처리본<br/>JSON Schema strict
+        O-->>S: items, stated_total
+        S->>S: sanitize: 허용 필드만, 금액 범위,<br/>원문에 없는 인용은 "원문 확인 필요", AI 응답도 다시 가림
+        S->>S: 로그는 항목 수·소요 시간만
+        S-->>B: 항목 표 데이터 (source: ai)
+        B-->>U: 표 + "AI" 표시, 사용자가 원문 대조·수정·확인
     end
 ```
 
-- `429 rate_limited`(속도 제한)·`503 no_ai`(AI 키 없음)는 OpenAI를 부르기 전에 돌려준다. 화면 처리는 오류와 같다(입력 유지·[다시 시도]·[직접 입력]).
-- 예시 문장(`SAMPLE_TEXT`)은 AI 키가 없거나 AI가 실패해도 서버에 저장된 예시 결과를 `source: "cache"`로 돌려준다. 화면은 이를 "저장된 예시 결과"로 구분할 수 있다.
+| 단계 | 어디서 | 지키는 것 |
+|---|---|---|
+| 치환 | 브라우저 `src/lib/mask.ts` | 원문과 치환 대응표는 서버로 보내지 않는다. `extractItems()`는 치환을 거친 타입(`ProcessedText`)만 받는다 |
+| 확인 | 브라우저 "전송본 확인" 패널 | 사용자가 실제로 보낼 글을 본 뒤에만 전송한다. 원문을 고치면 확인이 풀린다 |
+| 2차 가림 | 서버 `maskPII` | 같은 패턴으로 다시 가린다. AI 응답의 항목명·인용도 다시 검사한다 |
+| AI 없이 시작 | 브라우저 [AI 없이 직접 입력] | 국외 이전(OpenAI)을 원하지 않으면 서버 호출 없이 표를 직접 채운다 |
 
-### 2-2. 사진 지문 서버 기록 (`POST /api/receipt`)
+자동 패턴은 모든 개인정보를 찾지 못한다. 그래서 사용자가 가릴 단어를 추가하고, 보낼 글을 직접 확인하는 단계를 둔다.
+
+### 2-2. 사진: 방 상태 기록 (`POST /api/receipt`)
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor U as 사용자
-    participant B as 브라우저 (React)
+    participant B as 브라우저
     participant S as Express (Caddy 경유)
-    participant F as receipts.jsonl
+    participant D as SQLite receipts
 
-    U->>B: 구역 선택 후 [사진 추가]
-    B->>B: object URL로 화면에만 표시 (업로드 없음)
-    B->>B: Web Crypto로 파일 SHA-256 계산
-    U->>B: [서버 기록 남기기]
-    B->>S: POST /api/receipt (sha256 64자)
-    S->>S: 형식 검사 (16진수 64자)<br/>receivedAt = 서버 현재 시각<br/>sig = HMAC-SHA256(sha256|receivedAt)
-    S->>F: JSON 한 줄 추가
-    S-->>B: sha256, receivedAt, sig
-    B-->>U: "서버 기록 · 날짜 시각 · 지문 8자리" 배지
+    U->>B: 구역·입주/퇴실 고르고 사진 선택
+    alt JPEG·PNG가 아님
+        B-->>U: 차단, 지원 형식 안내
+    else JPEG·PNG
+        B->>B: 가림 대화상자: 불투명 상자 그리기<br/>(포인터 드래그 또는 키보드로 추가·이동·크기)
+        B->>B: Canvas로 다시 인코딩 → 새 파일<br/>EXIF·GPS 등 메타데이터 없음을 다시 읽어 확인
+        B-->>U: 처리본을 다시 디코딩한 미리보기 + 지문 값 ("전송본 확인")
+        U->>B: [확인하고 기록하기]
+        B->>B: 처리본 SHA-256 계산 (Web Crypto)
+        B->>S: POST /api/receipt {sha256}
+        S->>S: 형식 검사(16진수 64자)<br/>수신 시각 + HMAC-SHA256 서명
+        S->>D: 지문·시각·서명 저장
+        S-->>B: sha256, receivedAt, sig
+        B-->>U: 기록북에 처리본만 표시 + "서버 기록" 배지
+    end
 ```
 
-- 서버가 받는 것은 지문 문자열 하나뿐이다. 사진 파일·파일명·메모·구역은 보내지 않는다.
-- 지문 기록은 "이 시각에 이 지문을 가진 파일이 있었다"만 보여 준다. 사진 내용이나 촬영 시각을 증명하지 않는다.
+- 사진 업로드 API는 없다. 서버가 받는 값은 지문 문자열 하나다. 원본 파일명도 보내지 않는다.
+- 서버 기록은 "이 시각에 이 지문을 가진 파일이 있었다"만 보여 준다. 촬영 시점이나 사진 내용을 증명하지 않는다.
+- 사진 날짜는 EXIF에서 읽거나 사용자가 직접 입력하고, 어느 쪽인지 표시한다. 메타데이터는 처리본에서 지워진다.
 
----
-
-## 3. 개인정보 경계
+### 2-3. 데이터 경계 요약
 
 ```mermaid
 flowchart TB
     subgraph KEEP["브라우저 밖으로 나가지 않음"]
-        P1["사진 파일 (object URL)"]
-        P2["특약 문구"]
-        P3["내 이름·장소 (문자·내용증명용)"]
-        P4["문의 문자·내용증명 본문"]
+        K1["공제 문자 원문 · 치환 대응표"]
+        K2["사진 원본 · 가린 처리본 · 파일명"]
+        K3["특약 문구 · 계약자 선택"]
+        K4["문의 문자 · 내용증명 입력값"]
+        K5["변호사 찾아보기 조건"]
     end
-    subgraph SRV["서버로 가지만 저장하지 않음"]
-        T1["공제 메시지 본문"]
-    end
-    subgraph STORE["서버에 저장"]
-        R1["사진 지문 SHA-256 + 수신 시각 + 서명"]
+    subgraph PASS["서버를 거치지만 저장하지 않음"]
+        P1["공제 문자 처리본"]
     end
     subgraph EXT["국외 AI 제공사로 전달"]
-        O1["공제 메시지 본문 (OpenAI API)"]
+        E1["처리본 (OpenAI, 미국)"]
     end
-    T1 --> O1
-    P1 -->|"지문만 계산해서 전송"| R1
+    subgraph STORE["서버에 저장 (2026-12-31 일괄 삭제)"]
+        S1["사진 처리본 지문 + 수신 시각 + 서명"]
+        S2["설문 선택값 · 구매 의향 · 익명 횟수"]
+    end
+    K1 -->|"치환 + 사용자 확인"| P1
+    P1 --> E1
+    K2 -->|"지문만 계산"| S1
 ```
 
-| 경계 | 현재(MVP) | 향후(창업 목표) |
-|---|---|---|
-| 사진 | 브라우저 안에서만 사용. 서버에는 SHA-256 지문만 보낸다 | 유료 기록북 보관을 고른 경우에만 위치정보(EXIF GPS)를 지운 이미지를 업로드 |
-| 공제 메시지 입력 | 입력 화면에서 이름·전화번호·계좌번호를 지우라고 안내. 서버는 본문을 저장·로그하지 않고 OpenAI로 전달 | OpenAI로 보내기 전에 서버에서 입력 본문에도 개인정보 패턴 가림 적용, 브라우저 단계 가림 추가 |
-| AI 응답 | 항목명·원문 인용에 섞인 주민등록번호·휴대전화·일반전화·계좌번호·이메일 패턴을 `●●●`로 가림 | 같음 |
-| 로그 | `[extract] ok items=N ms=M`처럼 항목 수·처리 시간만. 본문 없음 | 같음 |
-| 공제 사진·계약서 사진 | 받지 않음 (텍스트만) | 브라우저에서 특약 부분만 자르기·가림·위치정보 제거 후 가린 이미지만 서버로 |
-
-자세한 처리 항목·보유 기간·국외 이전은 [PRIVACY_LEGAL.md](PRIVACY_LEGAL.md).
+보유 기간·국외 이전·권리 행사는 [PRIVACY_LEGAL.md](PRIVACY_LEGAL.md)와 화면 `#/privacy`에 있다.
 
 ---
 
-## 4. 역할 분리: AI · 코드 · 사용자
-
-AI는 **읽고 옮겨 적는 일**만 한다. 공제가 맞는지 판단하지 않는다.
+## 3. FR-02 AI 공제 정리: 역할 분리
 
 | 누가 | 하는 일 | 하지 않는 일 |
 |---|---|---|
-| **AI** (`gpt-5.4-mini`) | 불규칙한 한국어 메시지에서 항목명·청구액(원 단위)·원문 인용 추출. 단위가 애매하거나 금액이 없으면 `needs_check: true`. 총액 문장은 `stated_total`로만 | 적정성 평가, 법률 의견, 추천, 문자·내용증명 작성 |
-| **코드** (서버) | JSON Schema strict 검증, 허용 필드만 통과, 금액 범위(0~1억 원) 검사, 원문 대조(없는 인용 → 확인 필요), 개인정보 패턴 가림, 항목 30개·이름 40자·인용 120자 제한, 속도 제한, 45초 타임아웃 | 본문 저장·로그 |
-| **코드** (브라우저) | 입력 길이 검사, 합계·"내가 근거를 물어볼 금액" 계산, 특약 키워드 확인, 참고 자료 키워드 매칭, 문의 문자·내용증명 **고정 템플릿** 채우기, 압박 문구 차단, SHA-256 계산 | 문자 자동 발송 |
-| **사용자** | 원문과 대조해 [확인], 금액 수정, 물어볼 항목 선택, 특약 문구 붙여넣기, 문자를 복사해 **직접** 보내기 | — |
+| AI (`gpt-5.4-mini`) | 처리본에서 항목명·청구액(원 단위)·원문 인용 추출. 단위가 애매하거나 금액이 없으면 확인 필요 표시. 총액 문장은 따로 | 공제 적정성, 특약 효력, 환급액 판단, 문자·내용증명 작성 |
+| 서버 코드 | JSON Schema strict, 허용 필드만 통과, 금액 범위 검사, 원문에 없는 인용은 "원문 확인 필요", 2차 가림, 항목 수·길이 제한 | 본문 저장·로그 |
+| 브라우저 코드 | "내가 근거를 물어볼 금액" 합계, 참고 자료 5종 표시(`src/data/references.ts`), 특약 관련 문구 표시, 고정 문의 문자 서식 채우기 | 문자 자동 발송 |
+| 사용자 | 원문 대조·수정·확인, 물어볼 항목 선택, 문자 복사해 직접 보내기 | — |
+
+예시(합성): 공제 합계 780,000원 중 도배 300,000원 + 장판 250,000원을 고르면 "내가 근거를 물어볼 금액"은 550,000원이다.
 
 ---
 
-## 5. 배포
+## 4. FR-03 변호사 찾아보기: 브라우저 안 결정적 계산
+
+```mermaid
+flowchart LR
+    C["조건 입력<br/>주제(복수) · 방식 · 지역 · 예산 · 시점 · 언어<br/>각각 꼭 필요 / 선호 / 상관없음"]
+    F["거르기<br/>꼭 필요 조건 미충족·미확인 후보 제외"]
+    SC["점수<br/>100 × Σ(가중치×일치값) ÷ Σ(활성 가중치)"]
+    R["정렬<br/>점수 → 확인일 최근 → ID"]
+    OUT["최대 3명 + [전체 후보 보기]<br/>0명이면 없음 안내 + [조건 수정]"]
+    C --> F --> SC --> R --> OUT
+    OUT -.->|"지표 1건만"| M["POST /api/metric<br/>lawyer_search"]
+```
+
+- 계산은 `src/lib/lawyerMatch.ts`(순수 함수)와 `src/data/lawyers.ts`(데모용 가상 프로필)로 브라우저 안에서 끝난다. 서버·AI를 부르지 않는다. 서버로 가는 것은 조건 내용이 없는 익명 횟수 1건(`lawyer_search`)뿐이다.
+- 가중치: 주제 40 · 방식 20 · 지역 15 · 예산 15 · 시점 10. 주제 일치값 = 확인된 취급 주제 수 ÷ 선택한 주제 수. "상관없음" 기준은 계산에서 빠지고, 전화·영상만 고르면 지역이 빠진다. 미확인 값은 0점이고 "문의 필요"로 표시한다. 언어는 "꼭 필요"일 때만 거른다.
+- 조건을 바꾸면 점수·순위·추천 이유를 즉시 다시 계산하고 `aria-live`로 알린다.
+- 모든 프로필은 실제 변호사가 아닌 데모용 가상 데이터다. 연락·예약·자료 전송 기능이 없고, 소개비·수수료·광고비를 받지 않으며 돈으로 순위가 바뀌지 않는다(변호사법 제34조 고려). 공공 무료 상담 경로는 점수와 섞지 않고 따로 보여 준다.
+
+---
+
+## 5. 배포 구조
 
 ```mermaid
 flowchart LR
     DEV["개발자 맥<br/>deploy.sh"] -->|"① npm run build"| BUILD["dist/"]
-    BUILD -->|"② rsync<br/>node_modules·.git·.env·server/data 제외"| SRV["Oracle Cloud 서버<br/>~/bojeung"]
+    BUILD -->|"② rsync<br/>node_modules·.git·.env·server/data 제외"| SRV["Oracle Cloud 도쿄<br/>~/bojeung"]
     SRV -->|"③ npm install --omit=dev"| SRV
     SRV -->|"④ systemctl restart bojeung"| SVC["bojeung.service<br/>node server/server.mjs"]
     SVC -->|"⑤ curl /api/health"| OK["배포 확인"]
-    CADDY["Caddy<br/>bojeung.193-123-163-215.sslip.io<br/>ZeroSSL 인증서"] -->|"reverse_proxy 127.0.0.1:8420"| SVC
+    CADDY["Caddy<br/>bojeung.193-123-163-215.sslip.io"] -->|"reverse_proxy 127.0.0.1:8420"| SVC
 ```
 
 | 항목 | 내용 |
 |---|---|
-| 서버 | Oracle Cloud (Ubuntu 22.04, ARM A1, 도쿄 리전) |
-| 프로세스 관리 | systemd `bojeung.service` — 재시작·부팅 시 자동 실행 |
-| HTTPS | Caddy 리버스 프록시, ZeroSSL 자동 인증서, `sslip.io` 도메인 |
-| 비밀값 | `.env`(서버에만): `OPENAI_API_KEY`, `OPENAI_MODEL`, `PORT`, `RECEIPT_SECRET`. 저장소에는 `.env.example`만 |
+| 서버 | Oracle Cloud Infrastructure, 일본 도쿄 리전, Ubuntu 22.04 |
+| 런타임 | Node v22.23 · Express 4 |
+| 프로세스 관리 | systemd `bojeung.service` (재시작·부팅 시 자동 실행) |
+| HTTPS | Caddy 2.11 리버스 프록시, 인증서 자동 발급·갱신, `sslip.io` 도메인 |
 | 배포 스크립트 | `deploy.sh`: 빌드 → rsync → 의존성 설치 → 서비스 재시작 → 헬스 체크 |
-| 서버 데이터 보존 | rsync에서 `server/data`를 제외해 배포해도 지문 기록이 지워지지 않음 |
+| 서버 데이터 보존 | rsync에서 `server/data`를 빼서 배포해도 DB가 지워지지 않는다 |
 
 ---
 
-## 6. 기술 스택
+## 6. 보안
 
-| 구분 | 기술 | 버전 |
-|---|---|---|
-| 화면 | React · React DOM | 19.3.0 |
-| 언어 | TypeScript | 6.0.3 |
-| 빌드 | Vite · @vitejs/plugin-react | 8.3.2 · 6.1.1 |
-| 린트 | oxlint | ^1.81.0 |
-| 서버 | Node.js · Express | 22 · 4.22.3 |
-| AI | OpenAI Chat Completions API, `gpt-5.4-mini`, `response_format: json_schema (strict)` | — |
-| 웹 서버 | Caddy (HTTPS 자동) | 2 |
-| 해시·서명 | 브라우저 Web Crypto `SHA-256` / Node `crypto` HMAC-SHA256 | — |
-| 외부 UI 라이브러리 | 없음 (CSS 직접 작성) | — |
-| 개발 도구 | Claude Code (Claude Opus 5.5), Codex | — |
-
----
-
-## 7. 안전장치 요약
-
-| 위험 | 대응 (현재 구현) |
+| 위험 | 대응 |
 |---|---|
-| API 키 노출 | 키는 서버 환경 변수에만. 브라우저는 `/api/extract`만 호출 |
-| 남용·비용 폭주 | IP당 분당 30회 제한(`POST /api/extract`, `POST /api/receipt`), 본문 3,000자·요청 32KB 제한 |
-| AI 지연 | 45초 후 중단 → `504 timeout`, 화면은 입력 유지·[다시 시도]·[직접 입력] |
-| 프롬프트 인젝션 | 메시지를 구분자로 감싸 "자료로만 다뤄라" 지시, 시스템 프롬프트 7번 규칙, 출력은 스키마로 고정 |
-| AI가 없는 인용을 지어냄 | 서버가 원문과 공백 무시 대조 → 없으면 `quote_found: false`, "원문 확인 필요" |
-| 결론·과장 문구 | AI는 추출만, 문자·내용증명은 고정 템플릿, 내용증명 압박 문구 차단 |
-| 서버 정보 노출 | `x-powered-by` 끔, 오류 응답은 정해진 코드·한국어 메시지만 |
+| API 키 노출 | `OPENAI_API_KEY`·`RECEIPT_SECRET`은 서버 `.env`(환경 변수)에만 둔다. 저장소에는 `.env.example`만 있다. 브라우저는 OpenAI를 직접 부르지 않는다 |
+| 전송 구간 | Caddy HTTPS. Express는 `127.0.0.1`에만 열림 |
+| 남용·비용 | POST API에 IP당 분당 30회 제한. IP는 이 제한을 위해 메모리에만 두고 저장하지 않는다. 본문 3,000자·요청 32KB 제한 |
+| AI 지연 | 45초 후 중단, 화면은 입력을 유지하고 [다시 시도]·[직접 입력] 제공 |
+| 프롬프트 인젝션 | 처리본을 구분자로 감싸 "자료로만 다뤄라" 지시, 출력은 스키마로 고정 |
+| AI가 없는 인용을 지어냄 | 서버가 원문과 대조해 없으면 "원문 확인 필요" |
+| 로그 | `[extract] ok items=N ms=M`처럼 건수·소요 시간만. 본문·사진·이름은 로그에 남기지 않는다 |
+| 서버 정보 노출 | `x-powered-by` 끔, 오류는 정해진 코드·한국어 메시지만 |
+| 지문 기록 위조 | 수신 시각과 지문을 `RECEIPT_SECRET`으로 HMAC 서명 |
+
+정보보호 인증은 받지 않았다. 위 표는 팀이 직접 적용하고 점검한 내용이다.
+
+---
+
+## 7. 폴더 구조
+
+```text
+AIBuilder_Challenge/
+├── index.html              Vite 진입 HTML (Pretendard 글꼴 연결)
+├── public/                 그대로 복사되는 파일
+│   ├── marks/              공공누리 제4유형·개인정보 처리 표시(라벨링) 아이콘
+│   └── slides/             발표자료 (/slides/)
+├── src/
+│   ├── main.tsx · App.tsx  앱 시작, 상단 메뉴·바닥글·화면 전환
+│   ├── router.ts           해시 라우팅, 화면 이름·문서 제목
+│   ├── state.tsx           화면 사이에서 공유하는 메모리 상태
+│   ├── api.ts              서버 호출(/api/*), 무작위 기기 ID
+│   ├── types.ts            공통 타입
+│   ├── screens/            화면 하나당 파일 하나 (Home, Deduct, Record, Lawyers, Help, Cert, Pricing, Event, Privacy)
+│   ├── components/         화면 부품 (deduct/, home/, record/, 팝업·설문·바닥글 준수 표시 등)
+│   ├── lib/                순수 로직: mask.ts(텍스트 가림), imageMask.ts(사진 가림·재인코딩), exif.ts(날짜 읽기),
+│   │                       lawyerMatch.ts(조건 일치 계산), promo.ts(팝업·혜택 표시)
+│   ├── data/               고정 데이터: references.ts(참고 자료 5종), lawyers.ts(가상 프로필), agencies.ts(무료 상담 기관), company.ts(운영 정보)
+│   └── styles/             화면별 CSS (외부 UI 라이브러리 없음)
+├── server/
+│   ├── server.mjs          Express API + 정적 파일 제공
+│   └── data/               SQLite DB (저장소에 올리지 않음)
+├── docs/                   PRD와 설계 문서
+├── deploy.sh               배포 스크립트
+└── .env.example            환경 변수 이름 (실제 값은 .env, 저장소에 없음)
+```
+
+---
+
+## 8. 기술 스택
+
+| 구분 | 기술 |
+|---|---|
+| 화면 | React 19 · TypeScript 6 · Vite 8 · Pretendard 글꼴 |
+| 서버 | Node.js 22 · Express 4 · SQLite(`node:sqlite`) |
+| AI | OpenAI Chat Completions API, `gpt-5.4-mini`, `response_format: json_schema (strict)` |
+| 브라우저 API | Canvas(사진 가림·재인코딩), Web Crypto(SHA-256), Clipboard, 인쇄(PDF 저장) |
+| 웹 서버 | Caddy 2.11 (HTTPS 자동) |
+| 점검 | oxlint, Playwright·axe-core(접근성 자체 점검, 인증 아님) |
+
+---
+
+## 9. 개발 방식
+
+| 도구 | 쓴 곳 |
+|---|---|
+| Claude Code (Claude Opus 5.5) | 구현·통합 |
+| Claude Code (Claude Fable 5.1) | 화면 디자인·기능 구현 |
+| Claude Code 멀티 에이전트 워크플로 | 화면·문서를 파일 단위로 나눠 여러 에이전트가 병렬 작업 |
+| Claude 디자인 캔버스(Artifact) | 화면 시안 |
+| Codex | 팀원 요구사항·PRD 작성·검토 |
+| Opus 5.5 Max | 팀원 조사 |
+
+멀티 에이전트로 병렬 작업할 때는 **파일 소유권**을 먼저 나눴다. 에이전트마다 고칠 수 있는 파일을 정하고(예: 화면 한 개 + 그 화면의 CSS, 또는 문서 몇 개), 공유 파일(`App.tsx`·`router.ts`·`server.mjs`·`api.ts`)은 통합 담당 한 곳만 고치게 해서, 두 에이전트가 같은 파일을 동시에 고치지 않도록 했다. AI·오픈소스 사용 내역 전체는 [PRD 부록](PRD.md)에 있다.

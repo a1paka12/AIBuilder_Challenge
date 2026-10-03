@@ -1,0 +1,309 @@
+/*
+ * 첫 화면 (#/) — 메인 비주얼 → 업무 바로가기 → 진행 4단계 → 업무별 안내 → 이용 안내 → 이벤트 띠 → 약속 → 설문
+ * 공통 토큰·클래스(index.css)만 쓰고 index.css 는 손대지 않는다(필요한 덮어쓰기는 여기서).
+ * 정부 상징·기관 로고·인증 도장(둥근 배지) 모양은 쓰지 않는다. 모바일 390px 우선 · 좌우 16px 은 .main 이 준다 · 가로 스크롤 없음
+ * 터치 44px · 포커스 표시는 전역 :focus-visible · 움직임 줄이기에서는 전환을 끈다.
+ */
+.home { min-width: 0; }
+.home > * + * { margin-top: 36px; }
+.home [id] { scroll-margin-top: 84px; }
+.home .section-head { margin: 0 0 14px; }
+
+/* ── 1) 메인 비주얼 ───────────────────────── */
+.home-hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(300px, 0.92fr);
+  gap: 24px 36px;
+  align-items: center;
+  min-height: calc(100vh - 180px);
+  min-height: clamp(460px, calc(100svh - 180px), 720px);
+  padding: 40px 36px;
+  background: linear-gradient(160deg, #e6effb 0%, #f3f7fd 55%, var(--surface) 100%);
+  border: 1px solid #d3e0f1;
+  border-top: 4px solid var(--primary);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+/* 오른쪽 위 연한 빛 (장식) */
+.home-hero::before {
+  content: '';
+  position: absolute;
+  right: -120px;
+  top: -140px;
+  width: 420px;
+  height: 420px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(11, 78, 162, 0.1), rgba(11, 78, 162, 0));
+  pointer-events: none;
+}
+.home-hero-body { position: relative; z-index: 1; min-width: 0; }
+.home-hero h1 { margin: 0 0 14px; font-size: 34px; line-height: 1.3; color: var(--text); }
+.home-lead { margin: 0; max-width: 560px; font-size: 17px; line-height: 1.65; color: #3b424c; }
+
+.home-cta { display: flex; flex-wrap: wrap; gap: 8px; margin: 24px 0 0; }
+.home-cta .btn { min-width: 150px; }
+.home-cta .home-cta-main { padding-left: 24px; padding-right: 24px; font-size: 16px; }
+
+.home-facts { list-style: none; margin: 18px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 14px; color: var(--muted); }
+.home-facts li { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.home-fact-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-sm);
+  background: var(--chip);
+  border: 1px solid #c9d8ee;
+  color: var(--primary);
+}
+
+/* 그림(.hero-preview 는 index.css) — 800px 이하에서 숨기는 전역 규칙을 덮어 아래에 그대로 보여 준다 */
+.home-hero-visual { position: relative; z-index: 1; min-width: 0; }
+.home-hero .hero-preview { display: grid; }
+
+/* ── 2) 업무 바로가기 ───────────────────────── */
+.qm-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.qm-grid li { min-width: 0; }
+.qm-grid li.is-featured { grid-column: span 2; }
+.qm-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  min-height: 150px;
+  padding: 16px 14px 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  color: var(--text);
+  text-align: left;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.qm-tile:hover { border-color: var(--primary); box-shadow: 0 4px 14px rgba(11, 78, 162, 0.1); }
+.qm-tile:hover .qm-name { color: var(--primary); }
+.qm-tile.is-featured { background: linear-gradient(135deg, var(--primary-soft) 0%, var(--surface) 70%); border-color: #c9d8ee; }
+.qm-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  border: 1px solid #c9d8ee;
+  background: var(--chip);
+  color: var(--primary);
+}
+.qm-icon svg { width: 24px; height: 24px; }
+.qm-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding-right: 4px; }
+.qm-name { font-size: 16px; font-weight: 700; line-height: 1.35; }
+.qm-desc { font-size: 13px; line-height: 1.5; color: var(--muted); }
+.qm-badge { position: absolute; top: 12px; right: 12px; }
+
+/* 주 업무 타일(두 칸): 넓을 때는 아이콘 왼쪽 · 글 오른쪽 */
+@media (min-width: 641px) {
+  .qm-tile.is-featured { flex-direction: row; align-items: center; gap: 16px; padding-right: 96px; }
+  .qm-tile.is-featured .qm-icon { width: 56px; height: 56px; }
+  .qm-tile.is-featured .qm-icon svg { width: 28px; height: 28px; }
+  .qm-tile.is-featured .qm-name { font-size: 18px; }
+  .qm-tile.is-featured .qm-desc { font-size: 14px; }
+}
+
+/* ── 3) 이렇게 진행돼요 ───────────────────────── */
+.home-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.home-step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+  padding: 16px 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.home-step-top { display: flex; align-items: center; gap: 8px; }
+.home-step-no {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1;
+}
+.home-step-who { display: inline-block; padding: 2px 8px; border-radius: var(--radius-sm); border: 1px solid; font-size: 12px; font-weight: 700; line-height: 1.5; }
+.home-step-who.is-ai { background: var(--chip); color: var(--primary); border-color: #c9d8ee; }
+.home-step-who.is-me { background: var(--success-bg); color: var(--success); border-color: #b7e0cb; }
+.home-step-title { font-size: 15px; font-weight: 700; line-height: 1.4; }
+.home-step-desc { font-size: 14px; line-height: 1.55; color: var(--muted); }
+/* 다음 단계 화살표 (넓은 화면에서만) */
+.home-step:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  right: -10px;
+  top: 26px;
+  width: 8px;
+  height: 8px;
+  border-top: 2px solid var(--line-strong);
+  border-right: 2px solid var(--line-strong);
+  transform: rotate(45deg);
+}
+
+/* ── 3) 업무별 안내 ───────────────────────── */
+.hg-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.hg-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  grid-template-areas:
+    'head head'
+    'what roles'
+    'actions actions';
+  gap: 10px 24px;
+  min-width: 0;
+  padding: 18px 20px;
+  border-top: 3px solid var(--primary);
+}
+.hg-item:not(.is-brief) { grid-column: 1 / -1; }
+.hg-item.is-brief {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto 1fr auto; /* 설명 줄이 남는 높이를 먹어 버튼이 바닥에 붙는다 */
+  grid-template-areas:
+    'head'
+    'what'
+    'actions';
+  border-top-color: var(--line-strong);
+}
+.hg-head { grid-area: head; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.hg-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  border: 1px solid #c9d8ee;
+  background: var(--chip);
+  color: var(--primary);
+}
+.hg-title { margin: 0; font-size: 17px; line-height: 1.4; }
+.hg-what { grid-area: what; margin: 0; font-size: 15px; line-height: 1.65; color: #3b424c; }
+.hg-roles { grid-area: roles; margin: 0; display: grid; gap: 8px; align-content: start; }
+.hg-role { display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 8px; font-size: 14px; line-height: 1.6; }
+.hg-dt { display: flex; align-items: flex-start; gap: 6px; font-weight: 700; color: var(--primary-dark); }
+.hg-dt::before { content: ''; flex: none; width: 4px; height: 15px; margin-top: 4px; border-radius: 2px; background: currentColor; }
+.hg-dt.is-ai { color: var(--primary); }
+.hg-dt.is-me { color: var(--success); }
+.hg-dd { margin: 0; min-width: 0; color: var(--text); overflow-wrap: anywhere; }
+.hg-actions { grid-area: actions; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; padding-top: 12px; border-top: 1px dashed var(--line); }
+
+/* ── 이용 안내 (.notice-list 는 index.css) ───────────────────────── */
+.home-notes .notice-list .notice { height: 100%; }
+
+/* ── 4) 이벤트 띠 ───────────────────────── */
+.home-band {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px 24px;
+  padding: 22px 28px;
+  background: var(--navy);
+  color: #fff;
+  border-radius: var(--radius);
+}
+.home-band-text { min-width: 0; }
+.home-band-kicker { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 0 0 8px; }
+.home-band-count { font-size: 14px; color: #dfe6f0; font-variant-numeric: tabular-nums; }
+.home-band-count b { color: #fff; font-weight: 800; }
+.home-band-title { margin: 0 0 4px; font-size: 20px; line-height: 1.35; font-weight: 800; letter-spacing: -0.02em; color: #fff; }
+.home-band-sub { margin: 0; font-size: 13px; line-height: 1.6; color: #c3c9d2; }
+.home-band-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.home-band .btn.home-band-primary { background: #fff; border-color: #fff; color: var(--navy); }
+.home-band .btn.home-band-primary:hover { background: #e9f0fa; border-color: #e9f0fa; color: var(--navy); }
+.home-band .btn.home-band-ghost { background: transparent; border-color: rgba(255, 255, 255, 0.65); color: #fff; }
+.home-band .btn.home-band-ghost:hover { background: rgba(255, 255, 255, 0.12); border-color: #fff; color: #fff; }
+.home-band :focus-visible { outline-color: #fff; }
+
+/* ── 설문 이동 목표 (포커스를 받되 테두리는 그리지 않는다 — 카드 자체가 보인다) ── */
+.home-survey:focus, .home-survey:focus-visible { outline: none; }
+
+/* ── 반응형 ───────────────────────── */
+@media (max-width: 900px) {
+  .qm-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .qm-grid li.is-featured { grid-column: 1 / -1; }
+  .home-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .home-step::after { display: none; }
+}
+@media (max-width: 800px) {
+  .home-hero { grid-template-columns: minmax(0, 1fr); min-height: 0; gap: 24px; padding: 28px 20px 24px; }
+  .home-hero::before { right: -160px; top: -200px; }
+  .home-hero-visual { max-width: 520px; }
+  .home-band { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 640px) {
+  .home > * + * { margin-top: 28px; }
+  .home-hero { padding: 24px 16px 20px; }
+  .home-hero h1 { font-size: 26px; }
+  .home-lead { font-size: 15px; }
+  .home-cta { margin-top: 20px; }
+  .home-cta .btn { flex: 1 1 calc(50% - 4px); min-width: 0; padding-left: 10px; padding-right: 10px; }
+  .home-cta .home-cta-main { flex: 1 1 100%; }
+  .home-facts { gap: 4px 12px; font-size: 13px; }
+
+  .qm-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .qm-grid li.is-featured { grid-column: 1 / -1; }
+  .qm-tile { min-height: 136px; padding: 14px 12px 12px; }
+  .qm-name { font-size: 15px; }
+  .qm-badge { top: 10px; right: 10px; }
+
+  .home-steps { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .home-step { padding: 12px 14px; }
+
+  .hg-list { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .hg-item, .hg-item.is-brief { grid-template-columns: minmax(0, 1fr); padding: 16px 14px; gap: 10px; }
+  .hg-item {
+    grid-template-areas:
+      'head'
+      'what'
+      'roles'
+      'actions';
+  }
+  .hg-item.is-brief {
+    grid-template-areas:
+      'head'
+      'what'
+      'actions';
+  }
+  .hg-role { grid-template-columns: 96px minmax(0, 1fr); }
+  .hg-actions .btn { flex: 1 1 100%; }
+
+  .home-band { padding: 18px 16px; gap: 12px; }
+  .home-band-title { font-size: 18px; }
+  .home-band-actions .btn { flex: 1 1 calc(50% - 4px); min-width: 0; padding-left: 10px; padding-right: 10px; }
+}
+
+/* 움직임 줄이기 */
+@media (prefers-reduced-motion: reduce) {
+  .qm-tile { transition: none; }
+}
+
+/* 인쇄 */
+@media print {
+  .home-cta, .home-band, .hg-actions, .qm-grid { display: none !important; }
+  .home-hero, .qm-tile, .home-step, .hg-item { box-shadow: none; }
+}

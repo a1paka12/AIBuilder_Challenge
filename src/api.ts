@@ -1,7 +1,12 @@
 import type { ApiError, ExtractResponse, Item, ReceiptResponse } from './types'
+import type { ProcessedText } from './lib/mask'
 
+/**
+ * 합성 예시 — 가짜 연락처·계좌가 들어 있어 "기기 내 개인정보 제거"가 눈에 보인다(금액 5개·총 78만원은 그대로).
+ * 서버(server/server.mjs)의 SAMPLE_TEXT 는 이 글의 처리본(maskText 결과)과 같아야 저장된 예시 결과로 폴백된다.
+ */
 export const SAMPLE_TEXT =
-  '퇴실 정산입니다. 청소비 15만원, 도배 전체 30만원, 장판 25만원, 싱크대 시트지 5만원, 샷시 손잡이 3만원입니다. 총 78만원을 공제하려고 합니다.'
+  '퇴실 정산입니다. 청소비 15만원, 도배 전체 30만원, 장판 25만원, 싱크대 시트지 5만원, 샷시 손잡이 3만원입니다. 총 78만원을 공제하려고 합니다. 입금은 국민 123456-01-234567로 해 주세요. 문의 010-1234-5678'
 
 export const MAX_TEXT = 3000
 
@@ -29,8 +34,12 @@ async function postJson<T>(url: string, body: unknown, signal?: AbortSignal): Pr
   return data as T
 }
 
-/** 공제 메시지 정리 → Item[] 로 변환 */
-export async function extractItems(text: string, signal?: AbortSignal): Promise<{ items: Item[]; statedTotal: number | null; source: 'ai' | 'cache' }> {
+/**
+ * 공제 메시지 정리 → Item[] 로 변환.
+ * 처리본(ProcessedText: src/lib/mask.ts maskText 를 거쳐 기기 내 개인정보 제거가 끝난 글)만 받는다 — 원문 string 을 넘기면 타입 오류.
+ * 사용자가 전송본을 확인한 뒤에만 호출한다(Deduct 화면).
+ */
+export async function extractItems(text: ProcessedText, signal?: AbortSignal): Promise<{ items: Item[]; statedTotal: number | null; source: 'ai' | 'cache' }> {
   const res = await postJson<ExtractResponse>('/api/extract', { text }, signal)
   return {
     items: res.items.map((it) => ({
@@ -123,6 +132,6 @@ export function postSurvey(answer: { deducted: 'yes' | 'no' | 'not_yet'; asked?:
 }
 
 /** 익명 횟수 집계 — 실패해도 화면 동작에 영향 없음 */
-export function postMetric(event: 'copy_message' | 'cert_pdf' | 'book_pdf'): void {
+export function postMetric(event: 'copy_message' | 'cert_pdf' | 'book_pdf' | 'popup_event' | 'popup_help' | 'lawyer_search'): void {
   fetch('/api/metric', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event }) }).catch(() => {})
 }

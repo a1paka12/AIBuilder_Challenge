@@ -1,0 +1,112 @@
+/* 30초 현장 설문 — 첫 화면 카드 (익명 · 선택지만 · 이름/연락처 없음) */
+.survey { margin: 32px 0 0; padding: 20px; border-top: 3px solid var(--primary); }
+
+.survey-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px 16px; margin-bottom: 16px; }
+.survey-head-text { min-width: 0; }
+.survey-title { margin: 0 0 4px; font-size: 19px; line-height: 1.3; font-weight: 700; letter-spacing: -0.02em; color: var(--text); }
+.survey-desc { margin: 0; font-size: 14px; line-height: 1.6; color: var(--muted); }
+.survey-count { flex: none; margin-top: 2px; white-space: nowrap; }
+
+/* 질문 묶음 */
+.survey-form { display: grid; gap: 16px; }
+.survey-q { margin: 0; padding: 0; border: 0; min-width: 0; }
+.survey-q legend { padding: 0; margin: 0 0 10px; font-size: 15px; line-height: 1.5; font-weight: 700; color: var(--text); }
+.survey-legend { display: inline-flex; align-items: flex-start; gap: 8px; }
+.survey-n {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--primary-ink);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+/* 선택지 — 진짜 라디오를 숨기고 라벨을 칩처럼 그린다 (키보드·스크린리더는 라디오 그대로) */
+.survey-opts { display: flex; flex-wrap: wrap; gap: 8px; }
+.survey-opt { position: relative; display: inline-flex; min-width: 0; }
+.survey-opt input {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.survey-opt-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 14px 8px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.12s, border-color 0.12s, color 0.12s;
+}
+.survey-opt-label::before {
+  content: '';
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--line-strong);
+  background: var(--surface);
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.survey-opt:hover .survey-opt-label { border-color: var(--primary); color: var(--primary); }
+.survey-opt:hover .survey-opt-label::before { border-color: var(--primary); }
+.survey-opt input:checked + .survey-opt-label { background: var(--primary); border-color: var(--primary); color: var(--primary-ink); }
+.survey-opt input:checked + .survey-opt-label::before { border-color: #fff; background: #fff; box-shadow: inset 0 0 0 3px var(--primary); }
+.survey-opt input:focus-visible + .survey-opt-label { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+/* 보내기 */
+.survey-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding-top: 4px; }
+.survey-actions .btn { min-width: 140px; }
+.survey-msg { margin: 0; min-height: 1.5em; font-size: 14px; font-weight: 600; color: var(--warn); }
+
+/* 응답 후 */
+.survey-done { display: grid; gap: 12px; padding: 16px; background: var(--primary-soft); border: 1px solid #cfdcef; border-radius: var(--radius-sm); }
+.survey-done-title { margin: 0; font-size: 16px; font-weight: 700; color: var(--primary-dark); }
+.survey-stats { margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.survey-stat { min-width: 0; padding: 10px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.survey-stat dt { margin: 0 0 2px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.survey-stat dd { margin: 0; font-size: 14px; line-height: 1.5; color: var(--text); }
+.survey-stat b { font-size: 20px; font-weight: 800; color: var(--primary); }
+.survey-edit { font-size: 14px; justify-self: start; min-height: 32px; }
+
+/* 뒤따라 나오는 질문은 살짝 나타난다 (움직임 줄이기 설정이면 바로 표시) */
+@keyframes survey-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.survey-q-follow { animation: survey-in 0.18s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .survey-q-follow { animation: none; }
+  .survey-opt-label, .survey-opt-label::before { transition: none; }
+}
+
+@media (max-width: 520px) {
+  .survey { padding: 16px; margin-top: 24px; }
+  .survey-head { flex-direction: column; gap: 8px; }
+  .survey-stats { grid-template-columns: minmax(0, 1fr); }
+  .survey-actions .btn { width: 100%; }
+}
+
+@media print {
+  .survey { display: none; }
+}

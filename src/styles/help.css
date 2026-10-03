@@ -1,0 +1,131 @@
+/*
+ * 무료 법률상담 기관·변호사 찾기 (#/help) — 공공 누리집 톤
+ * 공통 토큰·클래스(.btn .card .badge .notice .section-head .eyebrow .lead .linklike .muted .small)를 쓰고
+ * 로고·인증마크·도장 모양은 쓰지 않는다. 모바일 390px 우선, 터치 44px, 가로 스크롤 없음.
+ */
+.help { min-width: 0; }
+.help > section { min-width: 0; }
+.help > section:focus { outline: none; }
+.help [id] { scroll-margin-top: 80px; }
+
+/* 스크린리더 전용 텍스트("(새 창)") */
+.help-sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0;
+}
+
+/* ── 현재 위치 ── */
+.help-crumb ol { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0 2px; font-size: 13px; color: var(--muted); }
+.help-crumb li { display: inline-flex; align-items: center; min-height: 44px; }
+.help-crumb li + li::before { content: '›'; margin: 0 6px; color: var(--line-strong); }
+.help-crumb button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; min-width: 44px; font-size: 13px; }
+.help-crumb [aria-current='page'] { font-weight: 700; color: var(--text); }
+
+/* ── 키 비주얼 ── */
+.help-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 16px 28px;
+  align-items: center;
+  padding: 28px;
+  background: var(--primary-soft);
+  border: 1px solid #d3e0f1;
+  border-top: 4px solid var(--primary);
+  border-radius: var(--radius);
+}
+.help-hero-body { min-width: 0; }
+.help-hero h1 { margin: 0 0 10px; }
+.help-hero-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+.help-hero-art { justify-self: center; width: 100%; max-width: 220px; color: var(--primary); animation: help-in 0.4s ease-out both; }
+.help-hero-art svg { display: block; width: 100%; height: auto; }
+@keyframes help-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ── 운영 원칙 고지 ── */
+.help-notice { margin: 16px 0 0; }
+.help-notice p { margin: 0; }
+.help-notice .help-law { margin-top: 2px; }
+
+/* ── 이럴 땐 상담 ── */
+.help-cases { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.help-case {
+  display: flex; align-items: center; gap: 12px; min-width: 0; padding: 12px 14px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow);
+  font-size: 15px; font-weight: 600; line-height: 1.45;
+}
+.help-case-icon {
+  flex: none; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px;
+  border-radius: var(--radius-sm); border: 1px solid #c9d8ee; background: var(--chip); color: var(--primary);
+}
+
+/* ── 어디에 물어볼까요 (순서 안내) ── */
+.help-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.help-step {
+  display: grid; grid-template-columns: 36px minmax(0, 1fr); grid-template-rows: auto auto 1fr; gap: 4px 12px; min-width: 0; padding: 16px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow);
+}
+.help-step-no {
+  grid-row: 1 / span 3; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px;
+  border-radius: 50%; background: var(--primary); color: #fff; font-weight: 800; font-size: 15px; line-height: 1;
+}
+.help-step-title { margin: 0; font-size: 16px; line-height: 1.4; font-weight: 700; align-self: center; }
+.help-step-desc { margin: 0; font-size: 15px; color: #3b424c; line-height: 1.6; }
+.help-step-action { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; margin-top: 10px; }
+
+/* ── 기관 카드 ── */
+.help-agencies { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.help-agency { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.help-agency:focus { outline: none; }
+.help-agency:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.help-agency.is-lawyer { border-top: 3px solid var(--navy); }
+.help-agency-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.help-agency-name { margin: 0; font-size: 17px; line-height: 1.4; }
+.help-agency-rows { margin: 0; display: grid; gap: 8px; }
+.help-agency-rows > div { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 8px; font-size: 15px; line-height: 1.6; }
+.help-agency-rows dt { font-weight: 700; color: var(--primary-dark); }
+.help-agency-rows dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.help-agency-note { margin: 0; padding: 8px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); color: var(--muted); line-height: 1.6; }
+.help-agency-foot { margin-top: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.help-agency-foot .btn svg { flex: none; }
+.help-agency-domain { min-width: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.help-checked { margin: 12px 0 0; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* ── 다른 업무 보기 ── */
+.help-more { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.help-more li { min-width: 0; }
+.help-more .btn { width: 100%; height: 100%; flex-direction: column; align-items: flex-start; gap: 2px; padding: 12px 14px; text-align: left; }
+.help-more .btn small { font-size: 13px; font-weight: 500; line-height: 1.5; color: var(--muted); }
+
+/* ── 반응형 ── */
+@media (max-width: 860px) {
+  .help-agencies { grid-template-columns: minmax(0, 1fr); }
+  .help-more { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .help-crumb ol { margin-bottom: 4px; }
+  .help-hero { grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 20px 16px; }
+  .help-hero-art { order: -1; justify-self: start; max-width: 132px; }
+  .help-hero-actions { margin-top: 16px; }
+  .help-hero-actions .btn { flex: 1 1 calc(50% - 4px); min-width: 0; padding-left: 10px; padding-right: 10px; }
+  .help-cases { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .help-steps { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .help-step { padding: 14px; }
+  .help-step-action .btn { flex: 1 1 100%; }
+  .help-agency { padding: 14px; }
+  .help-agency-rows > div { grid-template-columns: 48px minmax(0, 1fr); font-size: 14px; }
+  .help-agency-foot .btn { flex: 1 1 100%; }
+  .help-more { gap: 8px; }
+}
+
+/* 움직임 줄이기 */
+@media (prefers-reduced-motion: reduce) {
+  .help-hero-art { animation: none; }
+}
+
+/* 인쇄 */
+@media print {
+  .help-crumb, .help-hero-actions, .help-step-action, .help-more { display: none !important; }
+  .help-hero, .help-case, .help-step, .help-agency { box-shadow: none; }
+}

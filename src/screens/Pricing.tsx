@@ -1,11 +1,18 @@
+import { useEffect, useState } from 'react'
 import { go } from '../router'
+import { getStats, postIntent, SURVEY_REASON_LABEL, type Stats, type SurveyReason } from '../api'
 import '../styles/pages.css'
+
+type Product = 'book' | 'cert'
 
 interface Row {
   name: string
   price: string
   detail: string
   status?: string
+  /** 의향 버튼이 붙는 유료 상품 */
+  product?: Product
+  intentLabel?: string
 }
 
 const FREE: Row[] = [
@@ -13,65 +20,269 @@ const FREE: Row[] = [
   { name: '참고 자료', price: '무료', detail: '항목별 공개 자료 카드(원문 인용·범위 태그·출처·확인일)' },
   { name: '문의 문자', price: '무료', detail: '확인·체크한 항목의 근거를 묻는 문자 만들기·복사' },
   { name: '다음 단계 안내', price: '무료', detail: '키 반납 전 주의, 무료 상담 기관·변호사 검색 공식 링크' },
+  { name: '변호사 조건 추천(가상 프로필 시연)', price: '무료', detail: '상담 주제·방식·지역·예산·시점으로 후보 최대 3명과 추천 이유 · 소개비·수수료 없음, 연락은 직접' },
   { name: '기록북 사진 2장 체험', price: '무료', detail: '구역별 사진 기록·서버 기록·기록북 미리보기' },
 ]
 
 const PAID: Row[] = [
-  { name: '방 상태 기록북', price: '4,900원', detail: '방 1개·이사 1건: 사진 30장, PDF, 재다운로드' },
-  { name: '내용증명 서식 PDF', price: '건당 2,900원', detail: '입력한 내용이 그대로 들어가는 빈칸형 서식 PDF' },
+  {
+    name: '방 상태 기록북',
+    price: '4,900원',
+    detail: '방 1개·이사 1건: 사진 30장, PDF, 재다운로드',
+    product: 'book',
+    intentLabel: '기록북 4,900원이면 쓸 의향 있어요',
+  },
+  {
+    name: '내용증명 서식 PDF',
+    price: '건당 2,900원',
+    detail: '입력한 내용이 그대로 들어가는 빈칸형 서식 PDF',
+    product: 'cert',
+    intentLabel: '내용증명 서식 2,900원이면 쓸 의향 있어요',
+  },
   { name: '기관(대학 생활관·지자체)용 기록 관리', price: '—', detail: '여러 방의 입주·퇴실 기록 관리', status: '출시 예정' },
 ]
 
-function PriceTable({ caption, rows, kind }: { caption: string; rows: Row[]; kind: 'free' | 'paid' }) {
+const DONE_MSG = '의향을 기록했어요(결제 아님)'
+const RETRY_MSG = '지금은 기록하지 못했어요. 잠시 후 다시 눌러 주세요.'
+const REASON_KEYS = Object.keys(SURVEY_REASON_LABEL) as SurveyReason[]
+
+/* 이미 의향을 남긴 브라우저는 새로고침해도 같은 표시 (서버도 clientId로 중복을 세지 않는다) */
+const intentKey = (p: Product) => `bj_intent_${p}`
+function readIntent(p: Product): boolean {
+  try {
+    return localStorage.getItem(intentKey(p)) === '1'
+  } catch {
+    return false
+  }
+}
+function saveIntent(p: Product): void {
+  try {
+    localStorage.setItem(intentKey(p), '1')
+  } catch {
+    /* 저장이 막혀도 화면 동작에는 영향 없음 */
+  }
+}
+
+const num = (n: number) => n.toLocaleString('ko-KR')
+const pct = (n: number, d: number): string => (d > 0 ? `${Math.round((n / d) * 100)}%` : '—')
+
+function CheckIcon() {
   return (
-    <div className={`card price-card price-${kind}`}>
-      <h2>{caption}</h2>
-      <table className="price-table">
-        <thead>
-          <tr>
-            <th scope="col">상품</th>
-            <th scope="col">가격</th>
-            <th scope="col">포함 내용</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.name}>
-              <th scope="row">{r.name}</th>
-              <td className="price-cell">
-                {r.status ? <span className="badge warn">{r.status}</span> : <b>{r.price}</b>}
-              </td>
-              <td>{r.detail}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+      <path d="M5 12.5l4.2 4.2L19 7.5" />
+    </svg>
   )
 }
 
 export default function Pricing() {
+  const [stats, setStats] = useState<Stats | null>(null)
+  const [done, setDone] = useState<Record<Product, boolean>>(() => ({ book: readIntent('book'), cert: readIntent('cert') }))
+  const [pending, setPending] = useState<Product | null>(null)
+  const [errors, setErrors] = useState<Partial<Record<Product, string>>>({})
+
+  useEffect(() => {
+    let alive = true
+    getStats()
+      .then((s) => {
+        if (alive) setStats(s)
+      })
+      .catch(() => {
+        /* 집계 실패 시 패널만 숨긴다 */
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  async function leaveIntent(product: Product) {
+    setPending(product)
+    setErrors((e) => {
+      const next = { ...e }
+      delete next[product]
+      return next
+    })
+    try {
+      const r = await postIntent(product)
+      saveIntent(product)
+      setDone((d) => ({ ...d, [product]: true })) // counted=false(이미 기록된 브라우저)여도 같은 표시
+      if (r.stats) setStats(r.stats)
+    } catch {
+      setErrors((e) => ({ ...e, [product]: RETRY_MSG }))
+    } finally {
+      setPending(null)
+    }
+  }
+
+  // ── 집계 가공 ──
+  const intentTotal = stats ? stats.intents.book + stats.intents.cert : null
+  const survey = stats?.survey ?? null
+  const askedAnswered = survey ? survey.asked.yes + survey.asked.no : 0
+  const reasons = survey
+    ? REASON_KEYS.map((k) => ({ key: k, label: SURVEY_REASON_LABEL[k], n: survey.reasons[k] ?? 0 })).sort((a, b) => b.n - a.n)
+    : []
+  const reasonMax = Math.max(1, ...reasons.map((r) => r.n))
+  const reasonTotal = reasons.reduce((s, r) => s + r.n, 0)
+  const today: Partial<Record<string, number>> = stats?.metrics.today ?? {}
+  const total: Partial<Record<string, number>> = stats?.metrics.total ?? {}
+
   return (
     <section className="page pricing">
-      <h1>가격 안내</h1>
-      <p className="muted">로그인 없이 쓸 수 있어요. 가격은 아직 검증 중인 가설이에요.</p>
+      <header className="page-head">
+        <h1>가격 안내</h1>
+        <p className="muted">로그인 없이 쓸 수 있어요. 가격은 아직 검증 중인 가설이에요.</p>
+      </header>
 
       <ul className="page-notes">
-        <li>공제 정리·참고 자료·문의 문자는 영구 무료이며 어떤 유료 상품과도 묶지 않습니다.</li>
+        <li>공제 정리·참고 자료·문의 문자는 무료이며 어떤 유료 상품과도 묶지 않습니다.</li>
         <li>
           <strong>결제는 아직 연결하지 않았어요.</strong> 유료 상품은 데모에서 무료로 체험할 수 있어요.
         </li>
         <li>성공보수·변호사 소개비를 받지 않습니다.</li>
       </ul>
 
-      <div className="price-grid">
-        <PriceTable caption="무료(영구, 누구나)" rows={FREE} kind="free" />
-        <PriceTable caption="유료(가설)" rows={PAID} kind="paid" />
+      {/* ── 무료 ── */}
+      <div className="section-head">
+        <h2>무료(누구나)</h2>
+      </div>
+      <ul className="plan-table" aria-label="무료 상품">
+        {FREE.map((r) => (
+          <li key={r.name}>
+            <span className="plan-name">{r.name}</span>
+            <span className="plan-detail">{r.detail}</span>
+            <span className="badge ok plan-free-badge">{r.price}</span>
+          </li>
+        ))}
+      </ul>
+
+      {/* ── 유료(가설) ── */}
+      <div className="section-head">
+        <h2>유료(가설)</h2>
+        {intentTotal !== null && (
+          <p className="intent-count">
+            지금까지 <b>{num(intentTotal)}</b>명이 의향을 남겼어요 · 결제 아님
+          </p>
+        )}
+      </div>
+      <div className="plan-grid">
+        {PAID.map((r) => {
+          const p = r.product
+          const isDone = p ? done[p] : false
+          const err = p ? errors[p] : undefined
+          return (
+            <article className={`plan-card${r.status ? ' is-soon' : ''}`} key={r.name}>
+              <h3>{r.name}</h3>
+              <p className="plan-price">{r.status ? <span className="badge warn">{r.status}</span> : r.price}</p>
+              <p className="plan-detail">{r.detail}</p>
+              {p && r.intentLabel && (
+                <div className="plan-intent">
+                  <button
+                    type="button"
+                    className="btn primary"
+                    disabled={isDone || pending === p}
+                    aria-busy={pending === p || undefined}
+                    onClick={() => leaveIntent(p)}
+                  >
+                    {r.intentLabel}
+                  </button>
+                  <p className="plan-status" aria-live="polite">
+                    {isDone ? (
+                      <span className="plan-done">
+                        <CheckIcon />
+                        {DONE_MSG}
+                      </span>
+                    ) : err ? (
+                      <span className="plan-err">{err}</span>
+                    ) : null}
+                  </p>
+                </div>
+              )}
+            </article>
+          )
+        })}
       </div>
 
-      <p className="muted small">
+      <p className="muted small plan-disclaimer">
         보증금 지킴이는 공개 자료를 찾아 보여 주는 정보 제공 도구이며, 법률 판단이나 대리를 하지 않습니다. 공제 정리 결과나 판단을 따로 판매하지 않아요.
       </p>
+
+      {/* ── 현장 반응(익명 집계) — 집계를 못 불러오면 패널 전체를 숨긴다 ── */}
+      {stats && survey && (
+        <section className="field-panel card" aria-labelledby="field-title">
+          <div className="field-head">
+            <h2 id="field-title">현장 반응</h2>
+            <p className="muted small">설문·의향·사용 횟수의 익명 집계예요. 이름·연락처는 받지 않아요.</p>
+          </div>
+
+          {survey.total > 0 ? (
+            <>
+              <dl className="stat-grid">
+                <div className="stat">
+                  <dt>설문 응답</dt>
+                  <dd>
+                    <b>{num(survey.total)}</b>
+                    <span>건</span>
+                  </dd>
+                </div>
+                <div className="stat">
+                  <dt>떼인 적 있음</dt>
+                  <dd>
+                    <b>{pct(survey.deducted.yes, survey.total)}</b>
+                    <span>
+                      {num(survey.deducted.yes)}/{num(survey.total)}명
+                    </span>
+                  </dd>
+                </div>
+                <div className="stat">
+                  <dt>그중 안 물어봄</dt>
+                  <dd>
+                    <b>{pct(survey.asked.no, askedAnswered)}</b>
+                    <span>
+                      {num(survey.asked.no)}/{num(askedAnswered)}명
+                    </span>
+                  </dd>
+                </div>
+              </dl>
+
+              <h3 className="field-sub">안 물어본 이유</h3>
+              {reasonTotal > 0 ? (
+                <ul className="bars" aria-label="안 물어본 이유별 응답 수">
+                  {reasons.map((r) => (
+                    <li className="bar-row" key={r.key}>
+                      <span className="bar-label">{r.label}</span>
+                      <span className="bar-track" aria-hidden="true">
+                        <span className="bar-fill" style={{ width: `${(r.n / reasonMax) * 100}%` }} />
+                      </span>
+                      <span className="bar-value">{num(r.n)}명</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="field-empty">아직 응답이 없어요</p>
+              )}
+            </>
+          ) : (
+            <p className="field-empty">아직 응답이 없어요</p>
+          )}
+
+          <h3 className="field-sub">오늘 사용</h3>
+          <dl className="stat-grid">
+            <div className="stat">
+              <dt>오늘 정리 횟수</dt>
+              <dd>
+                <b>{num(today.extract_ok ?? 0)}</b>
+                <span>회 · 누적 {num(total.extract_ok ?? 0)}회</span>
+              </dd>
+            </div>
+            <div className="stat">
+              <dt>오늘 문자 복사 횟수</dt>
+              <dd>
+                <b>{num(today.copy_message ?? 0)}</b>
+                <span>회 · 누적 {num(total.copy_message ?? 0)}회</span>
+              </dd>
+            </div>
+          </dl>
+        </section>
+      )}
 
       <div className="page-actions">
         <button type="button" className="btn primary" onClick={() => go('deduct')}>

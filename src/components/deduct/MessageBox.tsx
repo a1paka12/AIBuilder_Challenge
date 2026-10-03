@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSelection, useStore } from '../../state'
+import { postMetric } from '../../api'
 import type { Item } from '../../types'
+import { IconCopy } from './icons'
 
 /** 고정 템플릿 한 종류 — 확인·체크한 항목과 금액만 들어간다 */
 export function buildInquiry(opts: { items: Item[]; myName: string; place: string; includeRest: boolean }): string {
@@ -59,6 +61,8 @@ export default function MessageBox() {
     try {
       if (!navigator.clipboard?.writeText) throw new Error('clipboard unavailable')
       await navigator.clipboard.writeText(message)
+      // 익명 횟수 집계(문자 내용은 보내지 않음) — 실패해도 복사 흐름에 영향 없음
+      postMetric('copy_message')
       setCopyFail(false)
       setToast(true)
       window.clearTimeout(toastTimer.current)
@@ -98,7 +102,7 @@ export default function MessageBox() {
 
       <label className="dd-check dd-option">
         <input type="checkbox" checked={includeRest} onChange={(e) => setIncludeRest(e.target.checked)} />
-        확인하는 동안 나머지 보증금은 먼저 돌려 달라는 문장 넣기
+        <span className="dd-check-text">확인하는 동안 나머지 보증금은 먼저 돌려 달라는 문장 넣기</span>
       </label>
 
       <div className="dd-row-actions">
@@ -123,17 +127,21 @@ export default function MessageBox() {
           <label className="dd-label" htmlFor="dd-message-text">
             문의 문자
           </label>
-          <textarea
-            id="dd-message-text"
-            ref={taRef}
-            className="dd-textarea dd-message-text"
-            readOnly
-            value={message}
-            rows={Math.min(12, message.split('\n').length + 1)}
-          />
+          {/* 말풍선 미리보기 — 자동 복사가 막혀도 길게 눌러 고를 수 있게 textarea 그대로 둔다 */}
+          <div className="dd-bubble">
+            <textarea
+              id="dd-message-text"
+              ref={taRef}
+              className="dd-textarea dd-message-text"
+              readOnly
+              value={message}
+              rows={Math.min(12, message.split('\n').length + 1)}
+            />
+          </div>
           <p className="small muted">항목·금액이나 위 입력을 바꾸면 문자도 함께 바뀌어요. 복사해서 직접 보내 주세요.</p>
-          <div className="dd-row-actions">
-            <button type="button" className="btn primary" onClick={copy}>
+          <div className="dd-row-actions dd-copy-row">
+            <button type="button" className="btn primary dd-copy" onClick={copy}>
+              <IconCopy size={18} />
               복사
             </button>
           </div>
