@@ -24,6 +24,9 @@ const OPENAI_DATA_URL = 'https://developers.openai.com/api/docs/guides/your-data
 const OPENAI_PRIVACY_URL = 'https://openai.com/policies/privacy-policy/'
 const ORACLE_PRIVACY_URL = 'https://www.oracle.com/legal/privacy/privacy-policy.html'
 const ORACLE_INQUIRY_URL = 'https://www.oracle.com/legal/data-privacy-inquiry-form/'
+const GOOGLE_PRIVACY_URL = 'https://policies.google.com/privacy?hl=ko'
+/** 회원 동의 버전 — server.mjs users.consent_version 과 같은 값 */
+const CONSENT_VERSION = '2026-10-03'
 
 const VERSIONS = [{ id: 'v1', label: `${EFFECTIVE} 제정·시행 (현재 판)` }]
 
@@ -43,7 +46,7 @@ const ARTICLES: ArticleDef[] = [
   { id: 'pv-a6', no: '제6조', title: '개인정보의 파기', kinds: ['destruction'] },
   { id: 'pv-a7', no: '제7조', title: '정보주체의 권리·의무와 행사 방법', kinds: ['rights'] },
   { id: 'pv-a8', no: '제8조', title: '개인정보의 안전성 확보 조치', kinds: ['safety'] },
-  { id: 'pv-a9', no: '제9조', title: '자동 수집 장치(쿠키 미사용·브라우저 저장소)', kinds: ['auto'] },
+  { id: 'pv-a9', no: '제9조', title: '자동 수집 장치(로그인 유지 쿠키·브라우저 저장소)', kinds: ['auto'] },
   { id: 'pv-a10', no: '제10조', title: 'AI 처리와 자동화된 결정', kinds: [] },
   { id: 'pv-a11', no: '제11조', title: '만 14세 미만 아동의 개인정보', kinds: [] },
   { id: 'pv-a12', no: '제12조', title: '개인정보 보호 담당과 문의처', kinds: ['officer', 'complaint'] },
@@ -60,9 +63,9 @@ interface Tile {
 }
 
 const TILES: Tile[] = [
-  { kind: 'items', title: '처리 항목', summary: '공제 문자 텍스트(저장 안 함) · 사진 지문 · 설문·구매 의향 응답 · 무작위 기기 ID', target: 'pv-a2' },
-  { kind: 'purpose', title: '처리 목적', summary: '공제 내역 정리 · 방 상태 기록 · 설문·의향 집계 · 서비스 운영', target: 'pv-a1' },
-  { kind: 'retention', title: '보유기간', summary: `공제 문자는 정리 직후 삭제 · 서버 기록은 ${RETENTION_END}까지`, target: 'pv-a3' },
+  { kind: 'items', title: '처리 항목', summary: '회원 정보(이메일·비밀번호 해시 또는 구글 식별값) · 공제 문자 텍스트(저장 안 함) · 사진 지문 · 설문·구매 의향 응답 · 무작위 기기 ID', target: 'pv-a2' },
+  { kind: 'purpose', title: '처리 목적', summary: '회원 식별·로그인 유지 · 공제 내역 정리 · 방 상태 기록 · 설문·의향 집계 · 서비스 운영', target: 'pv-a1' },
+  { kind: 'retention', title: '보유기간', summary: `회원 정보는 탈퇴 즉시 삭제 · 공제 문자는 정리 직후 삭제 · 서버 기록은 ${RETENTION_END}까지`, target: 'pv-a3' },
   { kind: null, title: '제3자 제공', summary: '하지 않아요', target: 'pv-a4' },
   { kind: 'overseas', title: '국외 이전', summary: 'OpenAI(미국) · Oracle 도쿄 리전(일본)', target: 'pv-a5' },
   { kind: 'complaint', title: '고충처리 부서', summary: `${COMPANY.operator} · ${COMPANY.contactLabel}`, target: 'pv-a12' },
@@ -265,7 +268,7 @@ export default function Privacy() {
       <header className="pv-head">
         <h1>개인정보 처리방침</h1>
         <p className="pv-lead">
-          {COMPANY.serviceName}는 회원가입·로그인이 없고, 서비스에 꼭 필요한 최소한의 정보만 처리해요. 아래에서 무엇을, 왜, 얼마나 처리하는지 조문별로
+          {COMPANY.serviceName}는 회원가입 없이도 모든 기능을 쓸 수 있고, 회원가입은 선택이에요. 가입하더라도 이메일과 로그인에 필요한 값만 받고, 서비스에 꼭 필요한 최소한의 정보만 처리해요. 아래에서 무엇을, 왜, 얼마나 처리하는지 조문별로
           확인할 수 있어요.
         </p>
         <div className="pv-version">
@@ -370,6 +373,11 @@ export default function Privacy() {
                 </thead>
                 <tbody>
                   <tr>
+                    <th scope="row">회원 식별·로그인 유지</th>
+                    <td>회원가입한 사람을 알아보고, 다시 들어올 때 로그인 상태를 유지하기(선택 가입 — 가입하지 않아도 모든 기능을 쓸 수 있어요)</td>
+                    <td>회원가입·로그인·내 계정</td>
+                  </tr>
+                  <tr>
                     <th scope="row">공제 내역 정리</th>
                     <td>붙여 넣은 공제 문자에서 항목·금액·원문 구절을 표로 옮겨 적기(공제가 맞는지 판단하지 않아요)</td>
                     <td>공제 정리</td>
@@ -391,18 +399,18 @@ export default function Privacy() {
                   </tr>
                   <tr>
                     <th scope="row">서비스 안정 운영</th>
-                    <td>같은 접속 주소의 요청을 분당 30회로 제한해 남용을 막기</td>
+                    <td>같은 접속 주소의 요청을 분당 30회(로그인·가입 요청은 분당 10회)로 제한해 남용을 막기</td>
                     <td>API 전체</td>
                   </tr>
                 </tbody>
               </table>
             </TableWrap>
-            <p className="small muted">회원가입·로그인·마케팅·광고·위치정보 수집은 하지 않아요.</p>
+            <p className="small muted">마케팅·광고·위치정보 수집은 하지 않아요. 회원 정보를 설문 응답·사진 지문 기록과 연결하지 않아요.</p>
           </Article>
 
           {/* 제2조 */}
           <Article id="pv-a2">
-            <p>처리하는 항목은 아래가 전부예요. 이름·연락처·계좌번호·주민등록번호·사진 파일은 받지 않아요.</p>
+            <p>처리하는 항목은 아래가 전부예요. 이름·전화번호·프로필 사진·계좌번호·주민등록번호·방 사진 파일은 받지 않아요. 구글로 가입해도 이름·프로필 사진은 저장하지 않아요.</p>
             <TableWrap label="제2조 처리 항목">
               <table className="pv-table wide">
                 <caption>처리 항목 · 수집 방법 · 저장 위치</caption>
@@ -415,6 +423,24 @@ export default function Privacy() {
                   </tr>
                 </thead>
                 <tbody>
+                  <tr>
+                    <th scope="row">회원 정보(선택 가입)</th>
+                    <td>
+                      이메일 주소, 이메일로 가입한 경우 비밀번호의 암호화 해시(scrypt, 원래 비밀번호는 저장하지 않아요), 구글로 가입한 경우 구글 계정 식별값(sub),
+                      가입 방법, 동의한 약관 버전({CONSENT_VERSION}), 가입 시각·최근 로그인 시각
+                    </td>
+                    <td>
+                      회원가입 화면에서 직접 입력할 때 · [구글로 간편 가입]·구글 로그인을 쓸 때 구글로부터 이메일·계정 식별값을 받아요(이름·사진은 받아도
+                      저장하지 않아요)
+                    </td>
+                    <td>서버 DB(users)</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">로그인 유지 쿠키</th>
+                    <td>회원 번호·발급 시각·서버 서명으로 된 값(bj_session). 이메일·비밀번호는 들어 있지 않아요</td>
+                    <td>로그인·가입할 때 서버가 브라우저에 저장</td>
+                    <td>브라우저(제9조)</td>
+                  </tr>
                   <tr>
                     <th scope="row">공제 문자 텍스트</th>
                     <td>사용자가 붙여 넣은 글. 브라우저에서 먼저 주민등록번호·전화번호·계좌번호·이메일 등을 [전화번호 삭제] 같은 형식으로 가린 처리본을 만들고, 사용자가 전송본을 확인한 뒤에만 보내요. 서버가 같은 패턴을 2차로 다시 가린 뒤 AI 에 넘겨요</td>
@@ -447,7 +473,7 @@ export default function Privacy() {
                   </tr>
                   <tr>
                     <th scope="row">접속 IP 주소</th>
-                    <td>요청 속도 제한(분당 30회) 확인에만 써요</td>
+                    <td>요청 속도 제한(분당 30회, 로그인·가입은 분당 10회) 확인에만 써요</td>
                     <td>접속 시 자동</td>
                     <td>서버 메모리에서 1분, 파일·DB 저장 안 함</td>
                   </tr>
@@ -466,7 +492,7 @@ export default function Privacy() {
           <Article id="pv-a3">
             <p>
               팀은 법령이나 정보주체 동의로 정한 기간 안에서만 개인정보를 보유해요. 서버 기록은 대회 데모 운영 기간이 끝나는 <b className="num">{RETENTION_END}</b>{' '}
-              까지 보관한 뒤 일괄 삭제하고, 삭제 요청을 받으면 그 전에라도 바로 삭제해요.
+              까지 보관한 뒤 일괄 삭제하고, 삭제 요청을 받으면 그 전에라도 바로 삭제해요. 회원 정보는 회원 탈퇴 즉시 삭제해요.
             </p>
             <TableWrap label="제3조 보유기간">
               <table className="pv-table wide cols-3">
@@ -479,6 +505,16 @@ export default function Privacy() {
                   </tr>
                 </thead>
                 <tbody>
+                  <tr>
+                    <th scope="row">회원 정보</th>
+                    <td className="num">탈퇴 즉시 삭제, 늦어도 {RETENTION_END} 일괄 삭제</td>
+                    <td>내 계정 → [회원 탈퇴]로 바로 지울 수 있어요(제7조)</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">로그인 유지 쿠키(bj_session)</th>
+                    <td>30일 또는 로그아웃·탈퇴할 때까지</td>
+                    <td>제9조 참고</td>
+                  </tr>
                   <tr>
                     <th scope="row">공제 문자 텍스트</th>
                     <td>정리 결과를 돌려준 즉시 서버 메모리에서 사라져요(저장·로그 없음)</td>
@@ -610,7 +646,8 @@ export default function Privacy() {
                     <tr>
                       <th scope="row">이전 항목</th>
                       <td>
-                        서버 DB 에 저장하는 사진 지문·수신 시각·서명, 설문 응답, 구매 의향, 익명 집계, 무작위 기기 ID · 처리 중에만 거쳐 가는 공제 문자(저장 안
+                        서버 DB 에 저장하는 회원 정보(이메일, 비밀번호 해시 또는 구글 계정 식별값, 동의 버전, 가입·최근 로그인 시각), 사진 지문·수신 시각·서명,
+                        설문 응답, 구매 의향, 익명 집계, 무작위 기기 ID · 처리 중에만 거쳐 가는 공제 문자(저장 안
                         함)와 접속 IP(메모리 1분)
                       </td>
                     </tr>
@@ -620,18 +657,27 @@ export default function Privacy() {
                     </tr>
                     <tr>
                       <th scope="row">보유·이용 기간</th>
-                      <td className="num">제3조와 같아요({RETENTION_END}까지, 요청 시 즉시)</td>
+                      <td className="num">제3조와 같아요(회원 정보는 탈퇴 즉시, 그 밖의 기록은 {RETENTION_END}까지·요청 시 즉시)</td>
                     </tr>
                     <tr>
                       <th scope="row">거부 방법·절차·효과</th>
                       <td>
-                        제12조 문의처로 거부 의사를 알려 주시면 해당 기록을 지워요. 거부하면 서버를 거치는 기능(AI 정리, 사진 지문 기록, 설문·구매 의향)은 쓸 수
+                        제12조 문의처로 거부 의사를 알려 주시면 해당 기록을 지워요(회원 정보는 내 계정 → [회원 탈퇴]로 바로 지울 수 있어요). 거부하면 서버를
+                        거치는 기능(회원가입·로그인, AI 정리, 사진 지문 기록, 설문·구매 의향)은 쓸 수
                         없고, 참고 자료 보기·내용증명 서식처럼 브라우저 안에서 도는 기능은 그대로 쓸 수 있어요.
                       </td>
                     </tr>
                   </tbody>
                 </table>
               </TableWrap>
+            </div>
+            <div className="pv-recipient">
+              <h3>참고: 구글 로그인을 쓸 때</h3>
+              <p>
+                [구글로 간편 가입]·구글 로그인을 쓰는 화면에서는 구글 로그인 버튼을 띄우려고 구글 스크립트(accounts.google.com)를 불러와요. 이때 구글과
+                주고받는 정보에는 <Ext href={GOOGLE_PRIVACY_URL}>Google 개인정보처리방침</Ext>이 적용돼요. 팀은 구글이 확인해 준 이메일과 계정
+                식별값만 받아 저장하고, 구글에 개인정보를 넘기지 않아요. 구글 로그인을 쓰지 않는 화면에서는 이 스크립트를 불러오지 않아요.
+              </p>
             </div>
             <div className="notice warn pv-callout" role="note">
               <strong>붙여 넣기 전에</strong>
@@ -647,7 +693,7 @@ export default function Privacy() {
                 <b>절차</b> — 보유기간이 끝나면 팀이 대상을 골라 삭제하고, 삭제 요청은 제12조 문의처로 받은 뒤 처리 결과를 알려 드려요.
               </li>
               <li>
-                <b>방법</b> — 서버 DB(SQLite)의 해당 행을 삭제해요. 공제 문자는 정리 응답 직후 메모리에서 사라지고 파일로 남지 않아요.
+                <b>방법</b> — 서버 DB(SQLite)의 해당 행을 삭제해요. 회원 탈퇴를 누르면 회원 정보 행을 그 자리에서 지우고 로그인 쿠키도 지워요. 공제 문자는 정리 응답 직후 메모리에서 사라지고 파일로 남지 않아요.
               </li>
               <li>
                 <b>브라우저 쪽</b> — 사진·정리 결과·서식 입력값은 탭을 닫거나 새로고침하면 사라지고, 저장소 값은 제9조 방법으로 직접 지울 수 있어요.
@@ -661,6 +707,14 @@ export default function Privacy() {
               정보주체는 언제든지 「개인정보 보호법」 제35조~제37조에 따라 개인정보 열람·정정·삭제·처리정지를 요구할 수 있고, 동의를 철회할 수 있어요.
               만 14세 미만 아동의 법정대리인도 같은 권리를 행사할 수 있어요.
             </p>
+            <div className="notice pv-callout" role="note">
+              <strong>회원 정보는 바로 지울 수 있어요</strong>
+              <p>
+                <a href="#/signup">내 계정</a>에서 가입한 이메일·가입 방법·가입일을 볼 수 있고, [회원 탈퇴]를 누르면 회원 정보가 즉시 삭제돼요. 열람·정정이
+                더 필요하면 아래 문의처로 알려 주세요.
+              </p>
+            </div>
+            <p>설문·구매 의향·사진 지문 기록은 회원 정보와 연결돼 있지 않아 아래 방법으로 요청해 주세요.</p>
             <ol className="pv-list">
               <li>아래 "내 기기 ID"를 복사해요. 설문·구매 의향 기록은 이 ID 로만 찾을 수 있어요(이름·연락처가 없으니까요).</li>
               <li>
@@ -690,7 +744,15 @@ export default function Privacy() {
                 <tbody>
                   <tr>
                     <th scope="row">최소 수집</th>
-                    <td>회원·로그인 없음. 이름·연락처·계좌·주민등록번호 입력란 자체를 두지 않아요</td>
+                    <td>회원가입은 선택이고 이메일과 로그인에 필요한 값만 받아요. 이름·연락처·계좌·주민등록번호 입력란 자체를 두지 않아요</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">비밀번호 암호화</th>
+                    <td>비밀번호는 무작위 솔트를 붙인 scrypt 해시로만 저장하고, 원래 비밀번호는 어디에도 남기지 않아요</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">로그인 쿠키 보호</th>
+                    <td>로그인 쿠키는 서버 서명(HMAC-SHA256)으로 위조를 막고, HttpOnly·SameSite=Lax·HTTPS 전용(Secure)으로 설정해 스크립트가 읽을 수 없어요</td>
                   </tr>
                   <tr>
                     <th scope="row">전송 구간 암호화</th>
@@ -714,7 +776,7 @@ export default function Privacy() {
                   </tr>
                   <tr>
                     <th scope="row">입력 제한·남용 방지</th>
-                    <td>본문 3,000자·요청 32KB 제한, 접속 주소당 분당 30회 제한</td>
+                    <td>본문 3,000자·요청 32KB 제한, 접속 주소당 분당 30회 제한(로그인·가입은 분당 10회)</td>
                   </tr>
                   <tr>
                     <th scope="row">기록 위변조 확인</th>
@@ -728,9 +790,31 @@ export default function Privacy() {
           {/* 제9조 */}
           <Article id="pv-a9">
             <p>
-              팀은 쿠키를 쓰지 않아요. 광고·방문 분석 도구·위치정보도 쓰지 않아요. 대신 브라우저 저장소(localStorage·sessionStorage)에 아래 값만 두고,
-              이 값은 서버로 자동 전송되지 않아요.
+              팀은 로그인한 회원의 로그인 상태를 유지하는 쿠키 하나(bj_session)만 써요. 광고·방문 분석 쿠키는 쓰지 않고, 방문 분석 도구·위치정보도 쓰지
+              않아요. 로그인하지 않으면 쿠키는 만들어지지 않아요.
             </p>
+            <TableWrap label="제9조 쿠키">
+              <table className="pv-table wide">
+                <caption>쓰는 쿠키</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">이름</th>
+                    <th scope="col">내용</th>
+                    <th scope="col">용도</th>
+                    <th scope="col">보관</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <th scope="row">bj_session</th>
+                    <td>회원 번호·발급 시각·서버 서명. HttpOnly(스크립트로 못 읽음)·SameSite=Lax·HTTPS 전용</td>
+                    <td>로그인 유지(필수 쿠키)</td>
+                    <td>30일, 로그아웃·탈퇴하면 바로 삭제</td>
+                  </tr>
+                </tbody>
+              </table>
+            </TableWrap>
+            <p>그 밖에는 브라우저 저장소(localStorage·sessionStorage)에 아래 값만 두고, 이 값은 서버로 자동 전송되지 않아요.</p>
             <TableWrap label="제9조 브라우저 저장소">
               <table className="pv-table wide">
                 <caption>브라우저 저장소에 두는 값</caption>
@@ -779,7 +863,8 @@ export default function Privacy() {
             <h3>거부 방법과 효과</h3>
             <p>
               브라우저 설정에서 이 사이트의 데이터를 삭제하거나 저장소를 차단하면 돼요. 그러면 "오늘 하루 보지 않기" 같은 설정 기억과 혜택 표시가
-              사라질 뿐, 기능은 그대로 쓸 수 있어요. 저장소를 차단한 상태에서는 기기 ID 가 그때그때 새로 만들어져요.
+              사라질 뿐, 기능은 그대로 쓸 수 있어요. 저장소를 차단한 상태에서는 기기 ID 가 그때그때 새로 만들어져요. 쿠키를 차단하면 로그인 상태를 유지할 수
+              없지만, 로그인이 필요 없는 기능은 모두 그대로 쓸 수 있어요.
             </p>
           </Article>
 
@@ -803,10 +888,10 @@ export default function Privacy() {
           {/* 제11조 */}
           <Article id="pv-a11">
             <p>
-              팀은 만 14세 미만 아동의 개인정보를 수집할 목적으로 서비스를 만들지 않았고, 나이를 포함해 누구인지 알 수 있는 정보를 받지 않아요. 만 14세
-              미만이라면 법정대리인과 함께 이용해 주세요.
+              만 14세 미만은 회원가입을 할 수 없어요. 가입할 때 "만 14세 이상" 확인에 동의해야 가입이 돼요. 팀은 만 14세 미만 아동의 개인정보를 수집할
+              목적으로 서비스를 만들지 않았고, 나이·생년월일은 받지 않아요. 가입 없이 쓰는 기능은 만 14세 미만이라면 법정대리인과 함께 이용해 주세요.
             </p>
-            <p>만 14세 미만 아동의 개인정보가 처리된 사실을 알게 되면 바로 삭제하고, 법정대리인의 요청이 있으면 제7조와 같은 방법으로 처리해요.</p>
+            <p>만 14세 미만 아동이 가입했거나 그 개인정보가 처리된 사실을 알게 되면 바로 삭제하고, 법정대리인의 요청이 있으면 제7조와 같은 방법으로 처리해요.</p>
           </Article>
 
           {/* 제12조 */}
@@ -887,7 +972,7 @@ export default function Privacy() {
                   <tr>
                     <th scope="row">제1판</th>
                     <td className="num">{EFFECTIVE}</td>
-                    <td>제정</td>
+                    <td>제정 — 선택 회원가입(이메일·구글)에 따른 회원 정보·로그인 유지 쿠키 처리 포함</td>
                   </tr>
                 </tbody>
               </table>

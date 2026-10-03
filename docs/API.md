@@ -9,8 +9,8 @@
 |---|---|
 | 기본 주소 | `https://bojeung.193-123-163-215.sslip.io` (로컬: `http://localhost:8420`) |
 | 형식 | 요청·응답 본문 JSON(`Content-Type: application/json`), 요청 본문 최대 **32KB** |
-| 인증 | 없음(로그인 없는 MVP) |
-| 속도 제한 | 모든 `POST` 엔드포인트에 **IP당 분당 30회**(1분 이동 창). IP는 서버 메모리에만 두고 DB·로그에 쓰지 않는다. 프록시(Caddy) 뒤라 `trust proxy 1` |
+| 인증 | 기본 기능은 로그인 없이 쓴다. 회원가입(FR-10, 선택)을 하면 HttpOnly 세션 쿠키 `bj_session`으로 로그인 상태를 유지하며, 이 쿠키가 필요한 곳은 `GET`·`DELETE /api/me`·`POST /api/auth/logout`뿐이다(10장) |
+| 속도 제한 | 모든 `POST` 엔드포인트에 **IP당 분당 30회**(1분 이동 창), `/api/auth/*`는 **IP당 분당 10회**. IP는 서버 메모리에만 두고 DB·로그에 쓰지 않는다. 프록시(Caddy) 뒤라 `trust proxy 1` |
 | 오류 형식 | `{ "error": "<코드>", "message": "<한국어 안내>" }` (예외: 지문 조회 404는 `{ "found": false }`, metric 400은 `{ "error": "bad_event" }`) |
 | 공통 오류 | `400 bad_request` JSON 형식 오류 · `413 too_large` 본문 32KB 초과 · `429 rate_limited` 속도 제한 초과 |
 
@@ -26,6 +26,13 @@
 | `POST` | `/api/metric` | 익명 사용 횟수 +1 | 예 |
 | `GET` | `/api/stats` | 의향·설문·횟수 공개 집계 | 아니요 |
 | `GET` | `/api/health` | 서버·AI 연결 상태 | 아니요 |
+| `GET` | `/api/config` | 공개 설정(구글 Client ID) (FR-10) | 아니요 |
+| `POST` | `/api/auth/signup` | 이메일 회원가입 (FR-10) | 예(분당 10회) |
+| `POST` | `/api/auth/login` | 이메일 로그인 (FR-10) | 예(분당 10회) |
+| `POST` | `/api/auth/google` | 구글 간편 가입·로그인 (FR-10) | 예(분당 10회) |
+| `POST` | `/api/auth/logout` | 로그아웃 (FR-10) | 예(분당 10회) |
+| `GET` | `/api/me` | 현재 로그인 사용자 (FR-10) | 아니요 |
+| `DELETE` | `/api/me` | 회원 탈퇴(즉시 삭제) (FR-10) | 아니요 |
 | `GET` | `/*` (`/api/` 제외) | 빌드된 화면 `dist/index.html` (해시 라우팅) | 아니요 |
 
 공통 `429` 응답:
@@ -354,11 +361,12 @@ AI는 옮겨 적기만 한다. 공제가 맞는지·특약이 유효한지·얼�
     "today": { "extract_ok": 12, "copy_message": 4 },
     "total": { "extract_ok": 12, "copy_message": 4 }
   },
-  "prices": { "book": 4900, "cert": 2900 }
+  "prices": { "book": 4900, "cert": 2900 },
+  "users": { "total": 2 }
 }
 ```
 
-(숫자는 형식 예시이며 실제 집계가 아니다.) `metrics.today`는 한국 시각 오늘, `metrics.total`은 전체 합계다.
+(숫자는 형식 예시이며 실제 집계가 아니다.) `metrics.today`는 한국 시각 오늘, `metrics.total`은 전체 합계다. `users.total`은 `users` 테이블의 실제 행 수(가입자 수, FR-10)이며, 화면은 0이면 가입자 수를 표시하지 않는다. 지어낸 숫자를 보태지 않는다.
 
 ---
 
@@ -380,6 +388,8 @@ AI는 옮겨 적기만 한다. 공제가 맞는지·특약이 유효한지·얼�
 | `OPENAI_MODEL` | `gpt-5.4-mini` | 정리에 쓰는 모델 |
 | `PORT` | `8420` | `127.0.0.1`에만 바인딩(외부는 Caddy가 HTTPS로 받아 넘김) |
 | `RECEIPT_SECRET` | 시작 시 임의 값 | 지문 기록 HMAC 서명 키 |
+| `GOOGLE_CLIENT_ID` | (없음) | 구글 OAuth 웹 클라이언트 ID(공개값). 없으면 `/api/config`가 `null`을 주고 화면은 "구글 간편 가입 준비 중"을 보이며, `/api/auth/google`은 `503 google_not_configured` |
+| `SESSION_SECRET` | `RECEIPT_SECRET` 값 | 세션 쿠키 HMAC 서명 키. 바꾸면 기존 로그인이 모두 풀린다 |
 
 `.env`는 저장소에 없고 `.env.example`만 있다. 실행: `npm install` → `npm run build` → `npm start` (개발: `npm run dev`).
 
@@ -393,5 +403,101 @@ AI는 옮겨 적기만 한다. 공제가 맞는지·특약이 유효한지·얼�
 | 사진 파일·원본 파일명·EXIF·GPS | 사진 업로드 API 없음, 지문만 전송 |
 | 변호사 찾아보기 조건·결과 | 브라우저 안에서 계산, `lawyer_search` 횟수만 전송 |
 | 문자·내용증명 입력값(이름·주소 등) | 브라우저 안에서 서식 채우기에만 사용 |
+| (FR-10) 구글 계정 이름·프로필 사진 | 서버가 토큰 검증 중 볼 수는 있으나 저장하지 않음. 이메일·`sub`만 저장 |
 
 저장 구조와 보유 기간(2026-12-31 일괄 삭제)은 [ERD.md](ERD.md) 참고.
+
+---
+
+## 10. 회원가입·로그인 (FR-10, 선택)
+
+회원가입은 선택이다. 가입하지 않아도 1~7장의 기능은 그대로 쓴다. 계정은 설문·의향과 연결하지 않는다(설문은 계속 익명 `client_id` 기준).
+
+**공통**
+
+- 오류 응답은 `{ "error": "<코드>" }`이며 화면이 코드를 한국어 안내로 바꿔 `aria-live` 영역에 보여 준다.
+- `/api/auth/*`는 IP당 분당 10회. 넘으면 `429 rate_limited`.
+- 응답의 `user` 객체: `{ "id": 1, "email": "me@example.com", "provider": "email", "createdAt": "2026-10-03T05:00:00.000Z" }`. 비밀번호 해시·`google_sub`는 응답에 넣지 않는다.
+- 로그인에 성공하면 `Set-Cookie: bj_session=<userId>.<issuedAtMs>.<서명>; HttpOnly; SameSite=Lax; Path=/; Max-Age=2592000`(+HTTPS면 `Secure`). 서명은 `HMAC-SHA256(SESSION_SECRET, "<userId>.<issuedAtMs>")` base64url. 구조는 [ERD.md](ERD.md) 2-3.
+- 이메일 인증 메일은 아직 보내지 않는다(대회 범위). 비밀번호 찾기도 없다.
+
+### 10-1. `GET /api/config`
+
+```json
+{ "googleClientId": "1234567890-abc.apps.googleusercontent.com" }
+```
+
+환경 변수 `GOOGLE_CLIENT_ID`(공개값). 설정되지 않았으면 `{ "googleClientId": null }`.
+
+### 10-2. `POST /api/auth/signup` — 이메일 가입
+
+```json
+{ "email": "me@example.com", "password": "8자 이상", "consent": { "privacy": true, "age14": true } }
+```
+
+| 상태 | 본문 | 언제 |
+|---|---|---|
+| `201` | `{ "user": {…} }` + 세션 쿠키 | 가입 성공(바로 로그인 상태) |
+| `400` | `{ "error": "bad_email" }` | 이메일 형식 아님 |
+| `400` | `{ "error": "weak_password" }` | 비밀번호 8자 미만 |
+| `400` | `{ "error": "consent_required" }` | `consent.privacy`·`consent.age14` 중 하나라도 `true`가 아님 |
+| `409` | `{ "error": "email_exists" }` | 같은 이메일(소문자 기준) 계정이 이미 있음 |
+
+- 이메일은 앞뒤 공백을 지우고 소문자로 바꿔 저장한다. 비밀번호는 `crypto.scrypt`(무작위 salt)로 해시해 `"salt:hash"`로 저장하고 원문은 남기지 않는다. `consent_version='2026-10-03'`.
+
+### 10-3. `POST /api/auth/login` — 이메일 로그인
+
+```json
+{ "email": "me@example.com", "password": "…" }
+```
+
+| 상태 | 본문 | 언제 |
+|---|---|---|
+| `200` | `{ "user": {…} }` + 세션 쿠키 | 성공. `last_login_at` 갱신 |
+| `401` | `{ "error": "invalid_credentials" }` | 계정이 없거나 비밀번호가 틀림(둘을 구분하지 않음) |
+| `401` | `{ "error": "use_google" }` | 구글로 가입한 계정(비밀번호 없음) → 구글 로그인 안내 |
+
+비밀번호 비교는 `crypto.timingSafeEqual`로 한다.
+
+### 10-4. `POST /api/auth/google` — 구글 간편 가입·로그인
+
+```json
+{ "credential": "<Google Identity Services가 준 ID 토큰>", "consent": { "privacy": true, "age14": true } }
+```
+
+`consent`는 처음 가입할 때만 필요하다(로그인이면 생략 가능).
+
+서버 처리 순서:
+
+1. `GOOGLE_CLIENT_ID`가 없으면 `503 google_not_configured`.
+2. `https://oauth2.googleapis.com/tokeninfo?id_token=<credential>`로 토큰을 검증한다. `aud === GOOGLE_CLIENT_ID`, `iss`가 `accounts.google.com` 또는 `https://accounts.google.com`, `exp`가 미래, `email_verified === 'true'`를 모두 만족해야 한다. 하나라도 어긋나거나 요청이 실패하면 `401 invalid_token`.
+3. `google_sub`(= 토큰 `sub`)가 같은 계정이 있으면 로그인 → `200 { user, isNew: false }`.
+4. 없고 같은 이메일의 **이메일 가입** 계정이 있으면 `409 email_exists_password`(계정을 합치지 않는다. 화면은 이메일로 로그인하라고 안내).
+5. 새 사용자면 `consent.privacy && consent.age14`가 필요하다. 없으면 `400 consent_required`(화면은 동의 단계로 돌려보냄). 있으면 `provider='google'`, `email`, `google_sub`만 저장 → `201 { user, isNew: true }`.
+
+토큰의 이름·프로필 사진은 저장하지 않고, 토큰 자체도 저장하지 않는다.
+
+| 상태 | 본문 |
+|---|---|
+| `200` | `{ "user": {…}, "isNew": false }` + 세션 쿠키 |
+| `201` | `{ "user": {…}, "isNew": true }` + 세션 쿠키 |
+| `400` | `{ "error": "consent_required" }` |
+| `401` | `{ "error": "invalid_token" }` |
+| `409` | `{ "error": "email_exists_password" }` |
+| `503` | `{ "error": "google_not_configured" }` |
+
+### 10-5. `GET /api/me`
+
+```json
+{ "user": { "id": 1, "email": "me@example.com", "provider": "google", "createdAt": "2026-10-03T05:00:00.000Z" } }
+```
+
+로그인하지 않았거나 쿠키 서명이 틀렸거나 30일이 지났거나 탈퇴한 계정이면 `{ "user": null }`(오류 아님, `200`).
+
+### 10-6. `POST /api/auth/logout`
+
+`{ "ok": true }` + `Set-Cookie: bj_session=; Max-Age=0`. 로그인하지 않은 상태에서 불러도 같다.
+
+### 10-7. `DELETE /api/me` — 회원 탈퇴
+
+쿠키의 사용자 행을 `users`에서 바로 삭제하고 쿠키를 지운다 → `{ "ok": true }`. 화면은 확인 단계를 거친 뒤에만 호출한다. 설문·의향은 원래 계정과 연결되지 않으므로 이 호출로 바뀌지 않는다(기기 ID 기준 삭제는 처리방침의 문의 절차).

@@ -5,10 +5,15 @@ const FOCUSABLE =
 
 /**
  * 대화상자 접근성 묶음 — 열릴 때 포커스 이동(initialFocus, 없으면 대화상자), Tab 가둠, Esc 닫기,
- * 닫히면(언마운트) 열기 전 요소로 포커스 복귀.
+ * 닫히면(언마운트) returnFocus(있으면) 또는 열기 전 요소로 포커스 복귀.
+ * 열 때 포커스가 body 로 빠져 있었을 수 있으니(예: 불러오는 동안 버튼 비활성) 복귀 대상은 명시하는 편이 안전하다.
  * "열릴 때 마운트, 닫힐 때 언마운트"되는 대화상자 컴포넌트 안에서 쓴다.
  */
-export function useModalA11y<T extends HTMLElement>(onClose: () => void, initialFocus?: RefObject<HTMLElement | null>) {
+export function useModalA11y<T extends HTMLElement>(
+  onClose: () => void,
+  initialFocus?: RefObject<HTMLElement | null>,
+  returnFocus?: RefObject<HTMLElement | null>,
+) {
   const dialogRef = useRef<T>(null)
 
   useEffect(() => {
@@ -19,9 +24,16 @@ export function useModalA11y<T extends HTMLElement>(onClose: () => void, initial
     })
     return () => {
       window.cancelAnimationFrame(raf)
-      if (prev && prev.isConnected) prev.focus()
+      const restore = () => {
+        const explicit = returnFocus?.current
+        const back = explicit && explicit.isConnected ? explicit : prev && prev.isConnected && prev !== document.body ? prev : null
+        back?.focus()
+        return !back || document.activeElement === back
+      }
+      // 닫는 렌더에서 아직 비활성(disabled)일 수 있으니 실패하면 다음 프레임에 한 번 더
+      if (!restore()) window.requestAnimationFrame(() => void restore())
     }
-    // 마운트 1회 — initialFocus 는 ref 라 바뀌지 않는다
+    // 마운트 1회 — initialFocus·returnFocus 는 ref 라 바뀌지 않는다
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

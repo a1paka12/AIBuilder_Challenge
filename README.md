@@ -26,6 +26,7 @@ KOOKMIN AI BUILDER CHALLENGE 2026 (주제 "귀찮음 주식회사") 출품작 ·
 | FR-07 | 선택 | 출시 이벤트 팝업·이벤트 상세 | `#/`, `#/event` | 첫 화면 레이어 팝업 2칸, 설문 응답 시 이 기기에서 기록북 범위(사진 30장)까지 체험 |
 | FR-08 | 선택 | 무료 상담 기관 안내 | `#/help` | 무료 상담 기관 5곳과 확인일 |
 | FR-09 | 선택 | 개인정보 처리방침 | `#/privacy` | 처리 표시(라벨링) 6칸, 목차, 제1~14조, 국외 이전(OpenAI 미국·Oracle 일본) 고지 |
+| FR-10 | 선택 | 회원가입·구글 간편 가입 + 가입 설문 | `#/signup` | 필수 동의 2개 → 구글로 간편 가입 또는 이메일·비밀번호 가입 → 30초 설문(건너뛰기 가능) → 완료. 내 계정에서 로그아웃·탈퇴(즉시 삭제). 이메일과 비밀번호 해시(또는 구글 계정 식별값)만 저장하며 **이메일 인증은 아직 없음**. 가입하지 않아도 모든 기능 사용 가능 |
 
 키보드만으로 모든 기능을 쓸 수 있게 만들었고, 배포본 9개 화면에서 axe(WCAG 2 A·AA) 심각·치명 0건을 자체 점검했습니다(인증 아님). 점검 스크립트는 `scripts/`에 있습니다. 화면별 설계는 [docs/SCREENS.md](docs/SCREENS.md)에 있습니다.
 
@@ -59,12 +60,27 @@ npm run build && npm start   # http://localhost:8420
 | `OPENAI_MODEL` | 사용할 모델 (기본 `gpt-5.4-mini`) |
 | `PORT` | 서버 포트 (기본 `8420`) |
 | `RECEIPT_SECRET` | 사진 지문 기록의 HMAC 서명 키 |
+| `GOOGLE_CLIENT_ID` | 구글 간편 가입용 OAuth 웹 클라이언트 ID(공개값). 비우면 구글 버튼 대신 "구글 간편 가입 준비 중"이 보이고 이메일 가입만 됨 |
+| `SESSION_SECRET` | 로그인 세션 쿠키(`bj_session`) HMAC 서명 키. 비우면 `RECEIPT_SECRET`을 씀. 바꾸면 기존 로그인이 모두 풀림 |
+
+### 구글 Client ID 설정 (선택)
+
+1. [Google Cloud Console](https://console.cloud.google.com/) → API 및 서비스 → **OAuth 동의 화면**을 만든다(외부, 앱 이름·지원 이메일만). 범위는 기본(`openid`·`email`·`profile`)만 쓰고 추가 범위는 요청하지 않는다.
+2. **사용자 인증 정보 → 사용자 인증 정보 만들기 → OAuth 클라이언트 ID → 웹 애플리케이션**.
+3. **승인된 JavaScript 원본**에 아래 세 주소를 넣는다(리디렉션 URI는 필요 없음 — 버튼이 ID 토큰을 바로 돌려준다).
+   - 배포 주소 `https://bojeung.193-123-163-215.sslip.io`
+   - `http://localhost:8420` (빌드 후 `npm start`)
+   - `http://localhost:5173` (`npm run dev`)
+4. 만든 클라이언트 ID(`…apps.googleusercontent.com`)를 서버 `.env`의 `GOOGLE_CLIENT_ID`에 넣고 서버를 다시 시작한다. 화면은 `GET /api/config`로 이 값을 받아 구글 공식 버튼을 그린다. 클라이언트 보안 비밀(secret)은 쓰지 않는다.
+5. 서버는 받은 ID 토큰을 `https://oauth2.googleapis.com/tokeninfo`로 검증(aud·iss·exp·email_verified)한 뒤에만 가입·로그인시킨다. 흐름은 [ARCHITECTURE 4-1](docs/ARCHITECTURE.md)에 있다.
+
+- OAuth 동의 화면이 "테스트" 상태면 테스트 사용자로 등록한 구글 계정만 로그인할 수 있다.
 
 ## 폴더 구조
 
 ```text
 src/
-  screens/      화면 (Home, Deduct, Record, Lawyers, Help, Cert, Pricing, Event, Privacy)
+  screens/      화면 (Home, Deduct, Record, Lawyers, Help, Cert, Pricing, Event, Privacy, Signup)
   components/   화면 부품 (공제 정리·첫 화면·기록 부품, 팝업, 설문, 바닥글 준수 표시)
   lib/          순수 로직 (mask.ts 텍스트 가림, imageMask.ts 사진 가림, lawyerMatch.ts 조건 일치 계산 등)
   data/         고정 데이터 (참고 자료, 가상 변호사 프로필, 무료 상담 기관, 운영 정보)

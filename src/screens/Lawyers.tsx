@@ -131,10 +131,12 @@ function LawyerArt() {
 
 /* ── 중요도(꼭 필요 / 선호 / 상관없음) ─────────────── */
 
-function LevelPicker({ name, target, value, onChange }: { name: string; target: string; value: Level; onChange: (v: Level) => void }) {
+function LevelPicker({ name, target, value, onChange, disabled, offNote }: { name: string; target: string; value: Level; onChange: (v: Level) => void; disabled?: boolean; offNote?: string }) {
   return (
-    <fieldset className="lw-level">
-      <legend className="lw-sr-only">{target} 중요도</legend>
+    <fieldset className={`lw-level${disabled ? ' is-off' : ''}`} disabled={disabled}>
+      <legend className="lw-sr-only">
+        {target} 중요도{disabled && offNote ? ` (${offNote})` : ''}
+      </legend>
       <span className="lw-level-label" aria-hidden="true">
         중요도
       </span>
@@ -142,7 +144,7 @@ function LevelPicker({ name, target, value, onChange }: { name: string; target: 
         const id = `${name}-${lv}`
         return (
           <span className={`lw-lv lw-lv-${lv}`} key={lv}>
-            <input type="radio" name={name} id={id} value={lv} checked={value === lv} onChange={() => onChange(lv)} />
+            <input type="radio" name={name} id={id} value={lv} checked={value === lv} disabled={disabled} onChange={() => onChange(lv)} />
             <label htmlFor={id}>
               {LEVEL_LABEL[lv]}
               <span className="lw-sr-only"> — {target}</span>
@@ -150,6 +152,11 @@ function LevelPicker({ name, target, value, onChange }: { name: string; target: 
           </span>
         )
       })}
+      {disabled && offNote && (
+        <span className="lw-level-off small muted" aria-hidden="true">
+          {offNote}
+        </span>
+      )}
     </fieldset>
   )
 }
@@ -167,7 +174,7 @@ interface ChoiceGroupProps<T extends string> {
   isChecked: (v: T) => boolean
   onToggle: (v: T) => void
   disabled?: boolean
-  level?: { value: Level; onChange: (v: Level) => void }
+  level?: { value: Level; onChange: (v: Level) => void; disabled?: boolean; offNote?: string }
   fieldsetRef?: Ref<HTMLFieldSetElement>
 }
 
@@ -184,7 +191,9 @@ function ChoiceGroup<T extends string>({ name, kind, legend, legendExtra, hint, 
           {hint}
         </p>
       )}
-      {level && <LevelPicker name={`${name}-lv`} target={legend} value={level.value} onChange={level.onChange} />}
+      {level && (
+        <LevelPicker name={`${name}-lv`} target={legend} value={level.value} onChange={level.onChange} disabled={level.disabled} offNote={level.offNote} />
+      )}
       <div className="lw-chips">
         {options.map((v, i) => {
           const id = `${name}-${i}`
@@ -366,6 +375,8 @@ export default function Lawyers() {
 
   const missing = missingFields(crit)
   const regionActive = isRegionActive(crit)
+  // 방문을 고르지 않았거나 방식이 상관없음이면 지역 중요도도 의미가 없다 (지역 '상관없음' 자체는 되돌릴 수 있게 비활성 대상에서 뺀다)
+  const visitOff = !crit.methods.includes('visit') || crit.levels.method === 'any'
 
   // 값이 다 모이면 즉시 계산 — 조건이 바뀌면 점수·순위·이유가 함께 바뀐다
   const result = useMemo(() => (missingFields(crit).length === 0 ? matchLawyers(crit) : null), [crit])
@@ -386,7 +397,15 @@ export default function Lawyers() {
   let status: string
   if (!result) status = `아직 고르지 않은 조건: ${missing.join(' · ')}. 다 고르면 후보를 바로 보여 줘요.`
   else if (total === 0) status = '현재 조건으로 확인된 후보가 없습니다.'
-  else status = `조건에 맞는 후보 ${total}명${hasMore && !showAll ? ` · 조건 일치 순으로 ${MAX_SHOWN}명 먼저` : ''}`
+  else {
+    // 순위·점수가 바뀌면 문장도 바뀌어야 다시 읽어 준다 — 1~3위 이름·점수와 빠진 기준을 함께 담는다
+    const top = result.ranked
+      .slice(0, 3)
+      .map((c, i) => `${i + 1}위 ${c.profile.name}(조건 일치 ${c.score})`)
+      .join(', ')
+    const off = !regionActive ? ' · 지역은 계산에서 제외' : ''
+    status = `조건에 맞는 후보 ${total}명${hasMore && !showAll ? ` · 조건 일치 순으로 ${MAX_SHOWN}명 먼저` : ''} · ${top}${off}`
+  }
 
   /** [조건 수정] — 조건 폼 첫 그룹(상담 주제)으로 포커스. 고른 값이 있으면 그 칸, 없으면 첫 칸 */
   const focusConditions = () => {
@@ -395,6 +414,16 @@ export default function Lawyers() {
     const target = root.querySelector<HTMLInputElement>('input:checked') ?? root.querySelector<HTMLInputElement>('input')
     root.scrollIntoView({ behavior: reduceMotion() ? 'auto' : 'smooth', block: 'center' })
     target?.focus({ preventScroll: true })
+    // 마우스로 누른 뒤의 프로그램 포커스는 :focus-visible 이 안 켜질 수 있어 잠깐 강조한다
+    const opt = target?.closest<HTMLElement>('.lw-opt')
+    if (opt) {
+      opt.classList.remove('lw-flash')
+      void opt.offsetWidth
+      opt.classList.add('lw-flash')
+      const clear = () => opt.classList.remove('lw-flash')
+      target?.addEventListener('blur', clear, { once: true })
+      window.setTimeout(clear, 2000)
+    }
   }
 
   const applyExample = () => {
@@ -514,7 +543,7 @@ export default function Lawyers() {
             isChecked={(v) => crit.region === v}
             onToggle={(v) => update((c) => (c.region = v))}
             disabled={!regionActive}
-            level={{ value: crit.levels.region, onChange: setLevel('region') }}
+            level={{ value: crit.levels.region, onChange: setLevel('region'), disabled: visitOff, offNote: '방문을 고르면 적용돼요' }}
           />
           <ChoiceGroup
             name={`${uid}-budget`}

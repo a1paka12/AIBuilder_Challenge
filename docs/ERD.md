@@ -15,6 +15,8 @@
 | 구매 의향 `intents` (결제 아님) | 서버 SQLite | 2026-12-31 일괄 삭제 | `POST /api/intent` |
 | 30초 현장 설문 `survey` | 서버 SQLite | 2026-12-31 일괄 삭제 | `POST /api/survey` |
 | 익명 사용 횟수 `metrics` | 서버 SQLite | 2026-12-31 일괄 삭제 | `POST /api/metric` + 서버 내부 집계 |
+| 회원 계정 `users` (FR-10, 선택) | 서버 SQLite | 탈퇴 즉시 삭제, 늦어도 2026-12-31 일괄 삭제 | `POST /api/auth/*`, `DELETE /api/me` |
+| 로그인 세션 쿠키 `bj_session` (FR-10) | 브라우저 쿠키(HttpOnly) | 30일 또는 로그아웃·탈퇴 시 삭제 | `server/server.mjs` |
 | 무작위 기기 ID·팝업·혜택 표시 | 브라우저 저장소(localStorage·sessionStorage) | 사용자가 지울 때까지 / 탭 닫을 때까지 | `src/api.ts`, `src/lib/promo.ts`, `src/screens/Pricing.tsx` |
 | 공제 정리 상태(원문·처리본·항목) | 브라우저 메모리(React 상태) | 새로고침·탭 닫기 시 사라짐 | `src/state.tsx`, `src/types.ts` |
 | 방 사진(가림 처리본) | 브라우저 메모리(object URL) | 새로고침·탭 닫기 시 사라짐 | `src/types.ts` `RoomPhoto` |
@@ -22,7 +24,8 @@
 | 참고 자료 5종 | 프론트엔드 정적 데이터 | 배포본과 함께 | `src/data/references.ts` |
 | 무료 상담 기관 5곳 | 프론트엔드 정적 데이터 | 배포본과 함께 | `src/data/agencies.ts` |
 
-- 회원·로그인이 없다. 서버 DB에는 4개 테이블만 있고, **이름·연락처·공제 문자 본문·사진은 어느 테이블에도 없다.**
+- 회원가입은 선택 기능(FR-10)이다. 가입하지 않아도 모든 기능을 쓸 수 있다. 서버 DB에는 5개 테이블이 있고, **이름·전화번호·공제 문자 본문·사진은 어느 테이블에도 없다.** `users`에는 로그인에 필요한 이메일과 비밀번호 해시(또는 구글 계정 식별값)만 있다.
+- `users`는 다른 테이블과 연결하지 않는다. 설문·구매 의향은 지금처럼 익명 기기 ID(`client_id`) 기준이며, 가입 중 설문에 응답해도 계정 번호는 함께 저장되지 않는다.
 - 서버 DB는 Node 내장 `node:sqlite`(`DatabaseSync`)를 쓰고 WAL 모드로 연다.
 
 ---
@@ -59,6 +62,17 @@ CREATE TABLE IF NOT EXISTS metrics (
   count INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (day, event)
 );
+-- FR-10 회원가입(선택). 이름·사진·전화번호 칸은 없다.
+CREATE TABLE IF NOT EXISTS users (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  provider        TEXT NOT NULL CHECK (provider IN ('email', 'google')),
+  email           TEXT NOT NULL UNIQUE,      -- 소문자로 정규화
+  password_hash   TEXT,                      -- 이메일 가입만: scrypt "salt:hash" 16진수
+  google_sub      TEXT UNIQUE,               -- 구글 가입만: ID 토큰의 sub
+  consent_version TEXT NOT NULL,             -- 동의한 약관 판 '2026-10-03'
+  created_at      TEXT NOT NULL,
+  last_login_at   TEXT NOT NULL
+);
 ```
 
 ### 2-1. 서버 DB 다이어그램
@@ -93,9 +107,19 @@ erDiagram
     CLIENT {
         TEXT client_id "테이블 아님 - 브라우저 bj_client_id 값"
     }
+    USERS {
+        INTEGER id PK "자동 증가"
+        TEXT provider "email | google"
+        TEXT email UK "소문자"
+        TEXT password_hash "scrypt salt:hash | NULL"
+        TEXT google_sub UK "구글 sub | NULL"
+        TEXT consent_version "2026-10-03"
+        TEXT created_at "ISO 8601 UTC"
+        TEXT last_login_at "ISO 8601 UTC"
+    }
 ```
 
-`receipts`·`metrics`는 다른 테이블과 연결되지 않는다(기기 ID도 받지 않는다).
+`receipts`·`metrics`는 다른 테이블과 연결되지 않는다(기기 ID도 받지 않는다). `users`도 어느 테이블과도 연결되지 않는다(설문·의향에 계정 번호를 넣지 않는다).
 
 ### 2-2. 컬럼 설명
 
@@ -147,11 +171,45 @@ erDiagram
 | `popup_help` | 브라우저 → `POST /api/metric` | 첫 화면 팝업에서 상담 기관 자세히 보기 |
 | `lawyer_search` | 브라우저 → `POST /api/metric` | 변호사 찾아보기 조건 검색 |
 
+**`users` — 회원 계정 (FR-10, 선택)**
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| `id` | INTEGER PK | 자동 증가 번호. 세션 쿠키에 들어가는 값 |
+| `provider` | TEXT | 가입 방법: `email`(이메일·비밀번호) · `google`(구글 간편 가입) |
+| `email` | TEXT UNIQUE | 로그인 아이디. 앞뒤 공백을 지우고 소문자로 바꿔 저장. 한 이메일은 한 계정만 |
+| `password_hash` | TEXT/NULL | 이메일 가입만. `crypto.scrypt`로 만든 `"salt:hash"`(둘 다 16진수). 비밀번호 원문은 어디에도 저장·기록하지 않는다. 구글 가입은 NULL |
+| `google_sub` | TEXT/NULL UNIQUE | 구글 가입만. 서버가 검증한 ID 토큰의 `sub`(구글 계정 고유 번호). 이름·사진은 토큰에 있어도 저장하지 않는다. 이메일 가입은 NULL |
+| `consent_version` | TEXT | 가입 때 동의한 약관 판. 지금은 `'2026-10-03'` |
+| `created_at` | TEXT | 가입 시각(ISO 8601, UTC) |
+| `last_login_at` | TEXT | 마지막 로그인 시각(ISO 8601, UTC) |
+
+- 이메일 인증 메일은 보내지 않는다(대회 범위). 그래서 이메일 가입 계정의 이메일이 본인 것인지는 확인하지 않는다. 구글 가입은 구글이 확인한 이메일(`email_verified`)만 받는다.
+- 같은 이메일로 이메일 가입이 이미 있으면 구글 간편 가입은 막는다(`409 email_exists_password`). 계정 합치기는 하지 않는다.
+- 탈퇴(`DELETE /api/me`)하면 그 행을 바로 지운다. 백업·보관 사본을 따로 두지 않는다.
+
+---
+
+### 2-3. 로그인 세션 쿠키 (FR-10)
+
+DB에 세션 테이블을 두지 않고, 서버가 서명한 쿠키 하나로 로그인 상태를 유지한다.
+
+| 항목 | 값 |
+|---|---|
+| 이름 | `bj_session` |
+| 값 | `<userId>.<issuedAtMs>.<서명>` — 서명은 `HMAC-SHA256(SESSION_SECRET, "<userId>.<issuedAtMs>")`를 base64url로 |
+| 서명 키 | 환경 변수 `SESSION_SECRET`, 없으면 `RECEIPT_SECRET` |
+| 속성 | `HttpOnly` · `SameSite=Lax` · `Path=/` · `Max-Age` 30일 · HTTPS(또는 `X-Forwarded-Proto: https`)일 때 `Secure` |
+| 확인 | 요청마다 서명을 다시 계산해 비교하고, 발급 후 30일이 지났거나 해당 `users` 행이 없으면(탈퇴) 로그아웃 상태로 본다 |
+| 삭제 | 로그아웃·탈퇴 때 `Max-Age=0`으로 덮어써 지운다 |
+
+쿠키에는 사용자 번호와 발급 시각만 있고 이메일·비밀번호는 없다. 화면 스크립트는 이 쿠키를 읽을 수 없다(HttpOnly).
+
 ---
 
 ## 3. 브라우저 저장소 키
 
-쿠키는 쓰지 않는다. 아래 값만 이 기기 브라우저에 두며, 서버로 자동 전송되지 않는다(`bj_client_id`만 설문·구매 의향을 보낼 때 요청 본문에 실린다). 저장소가 막힌 환경(사생활 모드 등)에서는 메모리 값으로만 동작한다.
+회원가입(FR-10)을 쓰면 위 로그인 세션 쿠키 `bj_session` 하나만 생긴다. 그 밖에는 쿠키를 쓰지 않는다. 아래 값만 이 기기 브라우저에 두며, 서버로 자동 전송되지 않는다(`bj_client_id`만 설문·구매 의향을 보낼 때 요청 본문에 실린다). 저장소가 막힌 환경(사생활 모드 등)에서는 메모리 값으로만 동작한다.
 
 | 이름 | 위치 | 값 | 용도 | 지우는 법 |
 |---|---|---|---|---|
@@ -174,7 +232,9 @@ erDiagram
 | 사진 원본 파일명·EXIF·GPS | 파일명은 서버로 보내지 않는다. 처리본은 canvas 재인코딩으로 메타데이터가 빠진 새 파일이다 |
 | 이름·주소·호수(문자·내용증명 입력값) | 브라우저 안에서 서식을 채우는 데만 쓴다 |
 | 변호사 찾아보기 조건 | 브라우저 안에서 점수를 계산한다. 서버에는 `lawyer_search` 횟수만 간다 |
-| IP 주소 | 요청 속도 제한(분당 30회)을 위해 서버 메모리에 1분간만 둔다. DB·파일에 쓰지 않는다 |
+| IP 주소 | 요청 속도 제한(분당 30회, `/api/auth/*`는 분당 10회)을 위해 서버 메모리에 1분간만 둔다. DB·파일에 쓰지 않는다 |
+| 비밀번호 원문 | 받자마자 scrypt 해시로 바꾸고 원문은 저장·기록하지 않는다 |
+| 구글 계정 이름·프로필 사진·ID 토큰 | 서버가 토큰을 검증하는 데만 쓰고 `sub`·이메일 외에는 저장하지 않는다. 토큰 자체도 저장하지 않는다 |
 | 서버 로그 | `[extract] ok items=5 ms=2310`처럼 건수·소요 시간만. 본문은 쓰지 않는다 |
 
 ---
@@ -183,7 +243,9 @@ erDiagram
 
 | 대상 | 기간 | 파기 |
 |---|---|---|
-| 서버 DB 4개 테이블 | **2026-12-31까지** | 그날 DB 파일을 일괄 삭제. 요청하면 즉시 삭제(기기 ID 기준) |
+| 서버 DB 4개 테이블(`receipts`·`intents`·`survey`·`metrics`) | **2026-12-31까지** | 그날 DB 파일을 일괄 삭제. 요청하면 즉시 삭제(기기 ID 기준) |
+| `users` (FR-10) | **탈퇴할 때까지, 늦어도 2026-12-31** | 탈퇴하면 즉시 행 삭제, 남은 계정은 그날 일괄 삭제 |
+| `bj_session` 쿠키 | 30일 | 로그아웃·탈퇴 시 삭제, 만료되면 브라우저가 지움 |
 | 브라우저 저장소 | 사용자가 지울 때까지(`bj_popup_closed`는 탭을 닫을 때까지) | 사용자가 브라우저에서 삭제 |
 | 브라우저 메모리(공제 정리·사진) | 새로고침·탭 닫기까지 | 자동 |
 
@@ -374,7 +436,7 @@ erDiagram
 
 ## 7. 향후(창업 목표) 데이터 모델 — 아직 구현하지 않음
 
-로그인·이사 건 단위 보관·기록북 재다운로드·결제를 붙일 때의 초안이다.
+이사 건 단위 보관·기록북 재다운로드·결제를 붙일 때의 초안이다. 회원 계정 자체는 FR-10 `users`로 먼저 만들었고, 아래는 그 계정에 보관 데이터를 붙이는 단계다.
 
 ```mermaid
 erDiagram

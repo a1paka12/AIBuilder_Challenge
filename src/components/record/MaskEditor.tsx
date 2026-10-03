@@ -6,7 +6,7 @@
  * 이 파일은 api.ts 를 불러오지 않는다. 네트워크 호출이 없고, [확인하고 기록하기] 를 눌렀을 때만 onConfirm 으로 처리본을 넘긴다.
  * 접근성: role=dialog·aria-modal·포커스 가둠·Esc(=취소)·닫으면 포커스 복귀, canvas 에 aria-label, 상자 추가·이동·크기·삭제는 aria-live 로 알림.
  */
-import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type RefObject } from 'react'
 import {
   MIN_SIZE,
   MaskError,
@@ -35,6 +35,8 @@ export interface MaskEditorProps {
   onCancel: () => void
   /** [확인하고 기록하기] 를 눌렀을 때만 불린다 */
   onConfirm: (result: ConfirmedTransfer) => void
+  /** 닫힌 뒤 포커스를 돌려줄 요소 (예: [사진 추가] 버튼) */
+  returnFocusRef?: RefObject<HTMLElement | null>
 }
 
 type Step = 'mask' | 'confirm'
@@ -59,7 +61,7 @@ function CloseIcon() {
   )
 }
 
-export default function MaskEditor({ file, label, onCancel, onConfirm }: MaskEditorProps) {
+export default function MaskEditor({ file, label, onCancel, onConfirm, returnFocusRef }: MaskEditorProps) {
   const uid = useId()
   const titleId = `${uid}-title`
   const descId = `${uid}-desc`
@@ -81,7 +83,7 @@ export default function MaskEditor({ file, label, onCancel, onConfirm }: MaskEdi
   const dragRef = useRef<Drag | null>(null)
   // 처리본 미리보기 object URL — 확인하면 소유권을 넘기고, 아니면 이 대화상자가 해제한다
   const ownedUrlRef = useRef<string | null>(null)
-  const { dialogRef, onKeyDown } = useModalA11y<HTMLDivElement>(onCancel, titleRef)
+  const { dialogRef, onKeyDown } = useModalA11y<HTMLDivElement>(onCancel, titleRef, returnFocusRef)
 
   const announce = (msg: string) => setLive(msg)
 

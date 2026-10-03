@@ -114,7 +114,13 @@ export default function Pricing() {
   }
 
   // ── 집계 가공 ──
-  const intentTotal = stats ? stats.intents.book + stats.intents.cert : null
+  /* 의향은 사람 수가 아니라 상품별 건수로 보여 준다(0건인 상품은 숨김) */
+  const intentParts = stats
+    ? [
+        stats.intents.book > 0 ? `기록북 의향 ${num(stats.intents.book)}건` : null,
+        stats.intents.cert > 0 ? `내용증명 의향 ${num(stats.intents.cert)}건` : null,
+      ].filter((x): x is string => x !== null)
+    : []
   const survey = stats?.survey ?? null
   const askedAnswered = survey ? survey.asked.yes + survey.asked.no : 0
   const reasons = survey
@@ -129,7 +135,7 @@ export default function Pricing() {
     <section className="page pricing">
       <header className="page-head">
         <h1>가격 안내</h1>
-        <p className="muted">로그인 없이 쓸 수 있어요. 가격은 아직 검증 중인 가설이에요.</p>
+        <p className="muted">회원가입·로그인 없이도 쓸 수 있어요. 가격은 아직 검증 중인 가설이에요.</p>
       </header>
 
       <ul className="page-notes">
@@ -157,11 +163,8 @@ export default function Pricing() {
       {/* ── 유료(가설) ── */}
       <div className="section-head">
         <h2>유료(가설)</h2>
-        {intentTotal !== null && (
-          <p className="intent-count">
-            지금까지 <b>{num(intentTotal)}</b>명이 의향을 남겼어요 · 결제 아님
-          </p>
-        )}
+        {intentParts.length > 0 && <p className="intent-count">{intentParts.join(' · ')}</p>}
+        <p className="muted small">같은 기기에서는 상품마다 한 번만 세요 · 결제 아님</p>
       </div>
       <div className="plan-grid">
         {PAID.map((r) => {

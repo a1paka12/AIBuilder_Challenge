@@ -135,7 +135,7 @@ export default function Survey() {
           <h2 id={`${uid}-title`} className="survey-title">30초 현장 설문</h2>
           <p className="survey-desc">퇴실 경험을 알려 주시면 서비스 근거로만 써요. 이름·연락처는 묻지 않아요.</p>
         </div>
-        {stats && (
+        {total > 0 && (
           <span className="badge survey-count">
             지금까지 <span className="num">{n(total)}</span>명 응답
           </span>

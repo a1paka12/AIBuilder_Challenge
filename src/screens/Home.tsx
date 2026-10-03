@@ -16,7 +16,7 @@ import '../styles/home.css'
  * 자동 넘김 캐러셀 없음(정적 한 장). 숫자는 PRD 예시·가격 가설·/api/stats 실제 값만.
  */
 
-const FACTS = ['로그인 없이 바로 시작', 'AI는 정리만, 판단은 하지 않아요', '붙여 넣은 문자는 서버에 저장하지 않아요']
+const FACTS = ['로그인 없이도 바로 시작', 'AI는 정리만, 판단은 하지 않아요', '붙여 넣은 문자는 서버에 저장하지 않아요']
 
 const STEPS: { who: 'me' | 'ai'; title: string; desc: string }[] = [
   { who: 'me', title: '공제 문자 붙여넣기', desc: '집주인이 보낸 문자를 그대로 붙여 넣어요. 이름·전화번호·계좌번호는 지우고요.' },

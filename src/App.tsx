@@ -10,10 +10,13 @@ import Privacy from './screens/Privacy'
 import Event from './screens/Event'
 import Help from './screens/Help'
 import Lawyers from './screens/Lawyers'
+import Signup from './screens/Signup'
 import PromoPopup from './components/PromoPopup'
 import FooterCompliance from './components/FooterCompliance'
 import { COMPANY } from './data/company'
+import { useMe } from './lib/auth'
 import './styles/shell.css'
+import './styles/signup.css'
 
 /* ── 화면 전환 ───────────────────────────────────────────────────────── */
 
@@ -59,6 +62,8 @@ function Screen() {
       return <Help />
     case 'lawyer':
       return <Lawyers />
+    case 'signup':
+      return <Signup />
     default:
       return <Home />
   }
@@ -143,7 +148,26 @@ const IconChat = () => (
   </LineIcon>
 )
 
+/* 사람 (계정) */
+const IconUser = () => (
+  <LineIcon size={16}>
+    <circle cx="12" cy="8" r="4" />
+    <path d="M4.5 20c1-3.6 4-5.5 7.5-5.5s6.5 1.9 7.5 5.5" />
+  </LineIcon>
+)
+
 /* ── 상단: 유틸리티 띠 + GNB ─────────────────────────────────────────── */
+
+/** 헤더 오른쪽 계정 버튼 — 로그인 전 "로그인·회원가입", 로그인 후 "내 계정" (둘 다 #/signup) */
+function AccountLink({ active }: { active: boolean }) {
+  const { status, user } = useMe()
+  return (
+    <a className="account-link" href={hrefOf('signup')} aria-current={active ? 'page' : undefined} data-loading={status === 'loading' || undefined}>
+      <IconUser />
+      <span>{user ? '내 계정' : '로그인·회원가입'}</span>
+    </a>
+  )
+}
 
 const MENU: { route: Route; label: string }[] = [
   { route: 'deduct', label: '공제 정리' },
@@ -231,6 +255,7 @@ function Header() {
               ))}
             </nav>
           </div>
+          <AccountLink active={route === 'signup'} />
         </div>
       </header>
     </>

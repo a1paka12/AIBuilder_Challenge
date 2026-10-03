@@ -36,16 +36,19 @@ flowchart LR
         CADDY["Caddy 2.11<br/>HTTPS 자동 인증서"]
         EXP["Express 4 · Node 22<br/>127.0.0.1:8420<br/>systemd bojeung.service"]
         DIST["dist/<br/>빌드된 화면 + /slides/"]
-        DB[("SQLite server/data/bojeung.db<br/>receipts · intents · survey · metrics")]
+        DB[("SQLite server/data/bojeung.db<br/>receipts · intents · survey · metrics<br/>users (FR-10, 선택)")]
         CADDY <-->|"리버스 프록시"| EXP
         EXP -->|"정적 파일"| DIST
         EXP <-->|"node:sqlite"| DB
     end
 
     OAI["OpenAI API (미국)<br/>gpt-5.4-mini<br/>구조화 출력 JSON Schema strict"]
+    GOO["Google (FR-10, 선택)<br/>GIS 버튼 · tokeninfo 검증"]
 
     SPA <-->|"HTTPS"| CADDY
     EXP <-->|"처리본 텍스트만<br/>제한 시간 45초"| OAI
+    SPA <-->|"구글 로그인 버튼<br/>ID 토큰"| GOO
+    EXP -->|"ID 토큰 검증"| GOO
 ```
 
 - Express는 `127.0.0.1`에만 열려 있다. 외부 요청은 모두 Caddy(HTTPS)를 거친다.
@@ -58,6 +61,7 @@ flowchart LR
 | `intents` | 무작위 기기 ID, 상품(book·cert), 가격 가설, 시각 | 결제 정보(결제 기능 없음) |
 | `survey` | 무작위 기기 ID, 보기 선택값, 시각 | 이름·연락처·자유 입력 |
 | `metrics` | 날짜, 이벤트 이름, 횟수 | 누가 했는지 |
+| `users` (FR-10, 선택) | 가입 방법, 이메일(소문자), 비밀번호 scrypt 해시 또는 구글 `sub`, 동의 판, 가입·마지막 로그인 시각 | 이름·사진·전화번호, 비밀번호 원문, 구글 ID 토큰. 설문·의향과 연결하지 않음 |
 
 ---
 
@@ -193,6 +197,51 @@ flowchart LR
 
 ---
 
+## 4-1. FR-10 회원가입: 구글 ID 토큰 검증과 세션 쿠키
+
+회원가입은 선택 기능이다. 가입하지 않아도 모든 기능을 쓸 수 있다. 서버는 비밀번호 원문이나 구글 토큰을 저장하지 않고, 서명된 쿠키 하나로 로그인 상태를 유지한다(세션 테이블 없음).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as 사용자
+    participant B as 브라우저 (#/signup)
+    participant G as Google (accounts.google.com)
+    participant S as Express 서버
+    participant D as SQLite users
+
+    U->>B: ① 필수 동의 2개 체크
+    B->>S: GET /api/config
+    S-->>B: { googleClientId } (없으면 null → "구글 간편 가입 준비 중")
+    B->>G: gsi/client 스크립트 동적 로드 · renderButton
+    U->>G: ② 구글 계정 선택
+    G-->>B: ID 토큰(credential, JWT)
+    B->>S: POST /api/auth/google { credential, consent }
+    S->>G: GET oauth2.googleapis.com/tokeninfo?id_token=…
+    G-->>S: aud · iss · exp · email · email_verified · sub
+    S->>S: aud = GOOGLE_CLIENT_ID · iss ∈ {accounts.google.com, https://accounts.google.com} · exp 미래 · email_verified='true'
+    alt 검증 실패
+        S-->>B: 401 invalid_token
+    else google_sub 있음
+        S->>D: last_login_at 갱신
+        S-->>B: 200 { user, isNew:false } + Set-Cookie bj_session
+    else 같은 이메일의 이메일 가입 계정
+        S-->>B: 409 email_exists_password (계정 합치지 않음)
+    else 새 사용자 + 동의 있음
+        S->>D: INSERT provider='google', email, google_sub
+        S-->>B: 201 { user, isNew:true } + Set-Cookie bj_session
+    end
+    B->>U: ③ 30초 설문(건너뛰기 가능) → ④ 가입 완료
+```
+
+- 이메일 가입은 `POST /api/auth/signup`으로 이메일(소문자)과 `crypto.scrypt` 해시(`"salt:hash"`)만 저장한다. 이메일 인증 메일은 아직 보내지 않는다.
+- 세션 쿠키 `bj_session = <userId>.<issuedAtMs>.<HMAC-SHA256(SESSION_SECRET, userId.issuedAt) base64url>`, `HttpOnly`·`SameSite=Lax`·`Path=/`·30일, HTTPS(Caddy가 붙이는 `X-Forwarded-Proto: https`)면 `Secure`. `SESSION_SECRET`이 없으면 `RECEIPT_SECRET`으로 서명한다. 쿠키는 의존성 없이 직접 파싱한다.
+- 요청마다 서명·30일 경과·사용자 행 존재를 확인한다. 탈퇴(`DELETE /api/me`)하면 행을 바로 지우므로 남은 쿠키도 무효가 된다.
+- 구글은 ID 토큰 검증에만 쓴다. 이름·프로필 사진은 저장하지 않고 구글 API에 다른 권한을 요청하지 않는다.
+- 설문은 계속 익명 기기 ID 기준이다. 가입 중 설문에 응답해도 `survey`에 계정 번호가 들어가지 않는다.
+
+---
+
 ## 5. 배포 구조
 
 ```mermaid
@@ -220,7 +269,7 @@ flowchart LR
 
 | 위험 | 대응 |
 |---|---|
-| API 키 노출 | `OPENAI_API_KEY`·`RECEIPT_SECRET`은 서버 `.env`(환경 변수)에만 둔다. 저장소에는 `.env.example`만 있다. 브라우저는 OpenAI를 직접 부르지 않는다 |
+| API 키 노출 | `OPENAI_API_KEY`·`RECEIPT_SECRET`·`SESSION_SECRET`은 서버 `.env`(환경 변수)에만 둔다. 저장소에는 `.env.example`만 있다. 브라우저는 OpenAI를 직접 부르지 않는다 |
 | 전송 구간 | Caddy HTTPS. Express는 `127.0.0.1`에만 열림 |
 | 남용·비용 | POST API에 IP당 분당 30회 제한. IP는 이 제한을 위해 메모리에만 두고 저장하지 않는다. 본문 3,000자·요청 32KB 제한 |
 | AI 지연 | 45초 후 중단, 화면은 입력을 유지하고 [다시 시도]·[직접 입력] 제공 |
@@ -229,6 +278,10 @@ flowchart LR
 | 로그 | `[extract] ok items=N ms=M`처럼 건수·소요 시간만. 본문·사진·이름은 로그에 남기지 않는다 |
 | 서버 정보 노출 | `x-powered-by` 끔, 오류는 정해진 코드·한국어 메시지만 |
 | 지문 기록 위조 | 수신 시각과 지문을 `RECEIPT_SECRET`으로 HMAC 서명 |
+| (FR-10) 비밀번호 유출 | `crypto.scrypt` + 무작위 salt 해시만 저장, 비교는 `timingSafeEqual`, 원문은 로그에도 남기지 않음. 로그인 실패는 "계정 없음"과 "비밀번호 틀림"을 구분하지 않음 |
+| (FR-10) 무차별 대입 | `/api/auth/*`는 IP당 분당 10회 |
+| (FR-10) 세션 탈취·위조 | `HttpOnly`(스크립트가 못 읽음)·`SameSite=Lax`·HTTPS면 `Secure`, HMAC 서명 검증, 30일 만료 |
+| (FR-10) 가짜 구글 토큰 | 서버가 tokeninfo로 aud·iss·exp·email_verified를 확인한 뒤에만 가입·로그인. `GOOGLE_CLIENT_ID`(공개값)가 없으면 503 |
 
 정보보호 인증은 받지 않았다. 위 표는 팀이 직접 적용하고 점검한 내용이다.
 

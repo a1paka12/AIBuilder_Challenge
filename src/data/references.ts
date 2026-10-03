@@ -22,6 +22,10 @@ export interface Reference {
   keywords: string[]
   /** 모든 항목에 공통으로 보여 주는 카드 */
   common: boolean
+  /** 문의 문자에 넣을 고정 인용 문장(없으면 문자에 넣지 않음) */
+  messageLine?: string
+  /** 문자 체크박스 옆 안내(없으면 생략) */
+  messageNote?: string
 }
 
 export const REFERENCE_KIND_LABEL: Record<ReferenceKind, string> = {
@@ -46,6 +50,9 @@ export const REFERENCES: Reference[] = [
     checkedAt: REFERENCE_CHECKED_AT,
     keywords: ['도배', '벽지', '장판', '바닥', '노후', '파손', '원상복구', '원상회복', '청소', '시트지', '싱크대'],
     common: false,
+    messageLine:
+      "참고로 주택임대차표준계약서 제9조에는 '시설물의 노후화나 통상 생길 수 있는 파손 등은 임차인의 원상복구의무에 포함되지 아니한다'는 단서가 있어, 위 항목이 여기에 해당하는지 함께 확인 부탁드립니다.",
+    messageNote: '계약서를 표준계약서로 썼을 때만',
   },
   {
     id: 'sc-2005da8323',
@@ -60,6 +67,8 @@ export const REFERENCES: Reference[] = [
     checkedAt: REFERENCE_CHECKED_AT,
     keywords: [],
     common: true,
+    messageLine:
+      '공제하실 때는 공제 사유를 확인할 수 있는 자료(사진, 견적서, 영수증 등)를 함께 보내 주시면 감사하겠습니다(대법원 2005다8323 판결 취지 참고).',
   },
   {
     id: 'sc-91da22605',
@@ -88,6 +97,8 @@ export const REFERENCES: Reference[] = [
     checkedAt: REFERENCE_CHECKED_AT,
     keywords: ['도배', '벽지', '장판', '바닥', '원상복구', '원상회복', '청소', '시트지', '싱크대', '수리'],
     common: false,
+    messageLine:
+      '실제로 원상복구 공사를 하실 예정인지도 알려 주시면 감사하겠습니다(대법원 2002다52657 판결 참고).',
   },
   {
     id: 'hldcc',

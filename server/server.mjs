@@ -28,7 +28,9 @@ const PORT = Number(process.env.PORT || 8420)
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || ''
 const MODEL = process.env.OPENAI_MODEL || 'gpt-5.4-mini'
 const RECEIPT_SECRET = process.env.RECEIPT_SECRET || crypto.randomBytes(32).toString('hex')
-const DATA_DIR = path.join(__dirname, 'data')
+const SESSION_SECRET = process.env.SESSION_SECRET || RECEIPT_SECRET
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || ''
+const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, 'data')
 const DB_PATH = path.join(DATA_DIR, 'bojeung.db')
 const MAX_TEXT = 3000
 const AI_TIMEOUT_MS = 45000
@@ -64,6 +66,18 @@ CREATE TABLE IF NOT EXISTS metrics (
   event TEXT NOT NULL,
   count INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (day, event)
+);
+-- 회원: 이메일·비밀번호 해시(일반 가입) 또는 구글 sub(구글 가입)만. 이름·사진·전화번호는 저장하지 않는다.
+-- 설문(survey)은 익명 client_id 기준이며 계정과 연결하지 않는다.
+CREATE TABLE IF NOT EXISTS users (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  provider        TEXT NOT NULL CHECK (provider IN ('email', 'google')),
+  email           TEXT NOT NULL UNIQUE,
+  password_hash   TEXT NULL,
+  google_sub      TEXT NULL UNIQUE,
+  consent_version TEXT NOT NULL,
+  created_at      TEXT NOT NULL,
+  last_login_at   TEXT NOT NULL
 );
 `)
 const PRICES = { book: 4900, cert: 2900 }
@@ -315,6 +329,183 @@ app.post('/api/metric', rateLimit, (req, res) => {
   return res.json({ ok: true })
 })
 
+// ── 회원 (이메일·구글) ─────────────────────────────────────────────
+const CONSENT_VERSION = '2026-10-03'
+const SESSION_COOKIE = 'bj_session'
+const SESSION_MAX_AGE_S = 30 * 24 * 3600
+const GOOGLE_TIMEOUT_MS = 10_000
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+// 인증 전용 속도 제한 (IP당 분당 10회)
+const authHits = new Map()
+function authRateLimit(req, res, next) {
+  const ip = req.ip || 'unknown'
+  const now = Date.now()
+  const arr = (authHits.get(ip) || []).filter((t) => now - t < 60_000)
+  if (arr.length >= 10) return res.status(429).json({ error: 'rate_limited', message: '요청이 너무 많아요. 잠시 후 다시 시도해 주세요.' })
+  arr.push(now)
+  authHits.set(ip, arr)
+  next()
+}
+app.use('/api/auth', authRateLimit)
+
+const normEmail = (s) => (typeof s === 'string' ? s.trim().toLowerCase() : '')
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16)
+  const hash = crypto.scryptSync(password, salt, 64)
+  return `${salt.toString('hex')}:${hash.toString('hex')}`
+}
+function verifyPassword(password, stored) {
+  const [saltHex, hashHex] = String(stored || '').split(':')
+  if (!saltHex || !hashHex) return false
+  const expected = Buffer.from(hashHex, 'hex')
+  const actual = crypto.scryptSync(password, Buffer.from(saltHex, 'hex'), 64)
+  return expected.length === actual.length && crypto.timingSafeEqual(expected, actual)
+}
+
+const sessionSig = (payload) => crypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('base64url')
+function parseCookies(req) {
+  const out = {}
+  for (const part of String(req.headers.cookie || '').split(';')) {
+    const i = part.indexOf('=')
+    if (i < 0) continue
+    const k = part.slice(0, i).trim()
+    if (!k || k in out) continue
+    try { out[k] = decodeURIComponent(part.slice(i + 1).trim()) } catch { out[k] = part.slice(i + 1).trim() }
+  }
+  return out
+}
+const isHttps = (req) => req.secure || String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() === 'https'
+function setSession(req, res, userId) {
+  const payload = `${userId}.${Date.now()}`
+  const value = `${payload}.${sessionSig(payload)}`
+  const attrs = [`${SESSION_COOKIE}=${value}`, 'HttpOnly', 'SameSite=Lax', 'Path=/', `Max-Age=${SESSION_MAX_AGE_S}`]
+  if (isHttps(req)) attrs.push('Secure')
+  res.append('Set-Cookie', attrs.join('; '))
+}
+function clearSession(req, res) {
+  const attrs = [`${SESSION_COOKIE}=`, 'HttpOnly', 'SameSite=Lax', 'Path=/', 'Max-Age=0']
+  if (isHttps(req)) attrs.push('Secure')
+  res.append('Set-Cookie', attrs.join('; '))
+}
+
+const selUserById = db.prepare('SELECT id, email, provider, created_at FROM users WHERE id = ?')
+const selUserByEmail = db.prepare('SELECT id, email, provider, password_hash, google_sub, created_at FROM users WHERE email = ?')
+const selUserBySub = db.prepare('SELECT id, email, provider, created_at FROM users WHERE google_sub = ?')
+const insUser = db.prepare(`INSERT INTO users (provider, email, password_hash, google_sub, consent_version, created_at, last_login_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?)`)
+const touchUser = db.prepare('UPDATE users SET last_login_at = ? WHERE id = ?')
+const delUser = db.prepare('DELETE FROM users WHERE id = ?')
+const qUsersTotal = db.prepare('SELECT COUNT(*) AS n FROM users')
+const publicUser = (u) => ({ id: u.id, email: u.email, provider: u.provider, createdAt: u.created_at })
+
+// 쿠키 검증 → 사용자 행 (없거나 위조·만료면 null)
+function sessionUser(req) {
+  const raw = parseCookies(req)[SESSION_COOKIE]
+  if (!raw) return null
+  const m = /^(\d+)\.(\d+)\.([A-Za-z0-9_-]+)$/.exec(raw)
+  if (!m) return null
+  const expected = Buffer.from(sessionSig(`${m[1]}.${m[2]}`))
+  const given = Buffer.from(m[3])
+  if (expected.length !== given.length || !crypto.timingSafeEqual(expected, given)) return null
+  const issuedAt = Number(m[2])
+  if (!Number.isFinite(issuedAt) || Date.now() - issuedAt > SESSION_MAX_AGE_S * 1000 || issuedAt > Date.now() + 60_000) return null
+  return selUserById.get(Number(m[1])) || null
+}
+const hasConsent = (c) => Boolean(c && c.privacy === true && c.age14 === true)
+
+app.get('/api/config', (_req, res) => res.json({ googleClientId: GOOGLE_CLIENT_ID || null }))
+
+app.post('/api/auth/signup', (req, res) => {
+  const email = normEmail(req.body?.email)
+  const password = req.body?.password
+  if (!email || email.length > 254 || !EMAIL_RE.test(email)) return res.status(400).json({ error: 'bad_email' })
+  if (typeof password !== 'string' || password.length < 8 || password.length > 200) return res.status(400).json({ error: 'weak_password' })
+  if (!hasConsent(req.body?.consent)) return res.status(400).json({ error: 'consent_required' })
+  if (selUserByEmail.get(email)) return res.status(409).json({ error: 'email_exists' })
+  const now = new Date().toISOString()
+  let id
+  try {
+    id = Number(insUser.run('email', email, hashPassword(password), null, CONSENT_VERSION, now, now).lastInsertRowid)
+  } catch {
+    return res.status(409).json({ error: 'email_exists' })
+  }
+  setSession(req, res, id)
+  return res.status(201).json({ user: publicUser(selUserById.get(id)) })
+})
+
+app.post('/api/auth/login', (req, res) => {
+  const email = normEmail(req.body?.email)
+  const password = req.body?.password
+  const u = email ? selUserByEmail.get(email) : null
+  if (u && u.provider === 'google') return res.status(401).json({ error: 'use_google' })
+  if (!u || typeof password !== 'string' || !verifyPassword(password, u.password_hash)) return res.status(401).json({ error: 'invalid_credentials' })
+  touchUser.run(new Date().toISOString(), u.id)
+  setSession(req, res, u.id)
+  return res.json({ user: publicUser(u) })
+})
+
+async function verifyGoogleToken(credential) {
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), GOOGLE_TIMEOUT_MS)
+  try {
+    const r = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`, { signal: ctrl.signal })
+    if (!r.ok) return null
+    const t = await r.json()
+    const issOk = t.iss === 'accounts.google.com' || t.iss === 'https://accounts.google.com'
+    const expOk = Number(t.exp) * 1000 > Date.now()
+    const verified = t.email_verified === 'true' || t.email_verified === true
+    if (t.aud !== GOOGLE_CLIENT_ID || !issOk || !expOk || !verified || !t.sub || !t.email) return null
+    return { sub: String(t.sub), email: normEmail(t.email) }
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+app.post('/api/auth/google', async (req, res) => {
+  if (!GOOGLE_CLIENT_ID) return res.status(503).json({ error: 'google_not_configured' })
+  const credential = req.body?.credential
+  if (typeof credential !== 'string' || !credential || credential.length > 4096) return res.status(401).json({ error: 'invalid_token' })
+  const g = await verifyGoogleToken(credential)
+  if (!g) return res.status(401).json({ error: 'invalid_token' })
+  const now = new Date().toISOString()
+  const existing = selUserBySub.get(g.sub)
+  if (existing) {
+    touchUser.run(now, existing.id)
+    setSession(req, res, existing.id)
+    return res.json({ user: publicUser(existing), isNew: false })
+  }
+  if (selUserByEmail.get(g.email)) return res.status(409).json({ error: 'email_exists_password' })
+  if (!hasConsent(req.body?.consent)) return res.status(400).json({ error: 'consent_required' })
+  let id
+  try {
+    id = Number(insUser.run('google', g.email, null, g.sub, CONSENT_VERSION, now, now).lastInsertRowid)
+  } catch {
+    return res.status(409).json({ error: 'email_exists_password' })
+  }
+  setSession(req, res, id)
+  return res.status(201).json({ user: publicUser(selUserById.get(id)), isNew: true })
+})
+
+app.get('/api/me', (req, res) => {
+  const u = sessionUser(req)
+  return res.json({ user: u ? publicUser(u) : null })
+})
+
+app.post('/api/auth/logout', (req, res) => {
+  clearSession(req, res)
+  return res.json({ ok: true })
+})
+
+app.delete('/api/me', (req, res) => {
+  const u = sessionUser(req)
+  if (u) delUser.run(u.id)
+  clearSession(req, res)
+  return res.json({ ok: true })
+})
+
 const qIntents = db.prepare('SELECT product, COUNT(*) AS n FROM intents GROUP BY product')
 const qSurveyTotal = db.prepare('SELECT COUNT(*) AS n FROM survey')
 const qSurveyBy = db.prepare('SELECT deducted, asked, reason, COUNT(*) AS n FROM survey GROUP BY deducted, asked, reason')
@@ -333,7 +524,7 @@ function getStats() {
   for (const r of qMetricsTotal.all()) total[r.event] = r.n
   const today = {}
   for (const r of qMetricsToday.all(kstDay())) today[r.event] = r.n
-  return { intents, survey, metrics: { today, total }, prices: PRICES }
+  return { intents, survey, metrics: { today, total }, prices: PRICES, users: { total: qUsersTotal.get().n } }
 }
 app.get('/api/stats', (_req, res) => res.json(getStats()))
 

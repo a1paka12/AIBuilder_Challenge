@@ -90,6 +90,14 @@
 .lw-lv input:checked + label { border-color: var(--primary); background: var(--primary-soft); color: var(--primary-dark); font-weight: 800; }
 .lw-lv-must input:checked + label { border-color: var(--warn); background: var(--warn-bg); color: var(--warn); }
 .lw-lv input:focus-visible + label { outline: 3px solid var(--focus); outline-offset: 2px; }
+.lw-lv input:disabled + label { opacity: 0.45; cursor: not-allowed; }
+.lw-level-off { margin-left: 4px; }
+/* [조건 수정] 으로 옮긴 프로그램 포커스 — 마우스 클릭 뒤에도 보이게 잠깐 강조 */
+.lw-opt.lw-flash input + label { outline: 3px solid var(--focus); outline-offset: 2px; animation: lw-flash 1.2s ease-out 2; }
+@keyframes lw-flash {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  50% { box-shadow: 0 0 0 6px var(--primary-soft); }
+}
 .lw-form-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding-top: 16px; border-top: 1px solid var(--line); }
 .lw-form-actions .small { flex: 1 1 100%; }
 
@@ -193,6 +201,7 @@
 @media (prefers-reduced-motion: reduce) {
   .lw-hero-art, .lw-cand { animation: none; }
   .lw-opt label, .lw-lv label { transition: none; }
+  .lw-opt.lw-flash input + label { animation: none; }
 }
 
 /* 인쇄 */

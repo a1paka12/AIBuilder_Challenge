@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 
-export type Route = 'home' | 'deduct' | 'record' | 'cert' | 'pricing' | 'privacy' | 'event' | 'help' | 'lawyer'
-const ROUTES: Route[] = ['home', 'deduct', 'record', 'cert', 'pricing', 'privacy', 'event', 'help', 'lawyer']
+export type Route = 'home' | 'deduct' | 'record' | 'cert' | 'pricing' | 'privacy' | 'event' | 'help' | 'lawyer' | 'signup'
+const ROUTES: Route[] = ['home', 'deduct', 'record', 'cert', 'pricing', 'privacy', 'event', 'help', 'lawyer', 'signup']
 
 /** 화면 이름 — 문서 제목(document.title)과 화면 이동 알림에 쓴다. 각 화면의 h1 과 맞춘다. */
 export const SCREEN_NAME: Record<Route, string> = {
@@ -14,6 +14,7 @@ export const SCREEN_NAME: Record<Route, string> = {
   event: '출시 기념 이벤트',
   help: '무료 법률상담 기관·변호사 찾기',
   lawyer: '변호사 찾아보기',
+  signup: '회원가입',
 }
 
 /** 브라우저 탭 제목 — 첫 화면만 서비스 이름이 앞에 온다 */

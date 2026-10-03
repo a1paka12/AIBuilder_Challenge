@@ -144,6 +144,7 @@ export default function RecordScreen() {
   const [errors, setErrors] = useState<{ [id: string]: string }>({})
   const [showPreview, setShowPreview] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  const addBtnRef = useRef<HTMLButtonElement>(null)
   const previewRef = useRef<HTMLDivElement>(null)
 
   const openPicker = () => fileRef.current?.click()
@@ -266,7 +267,8 @@ export default function RecordScreen() {
       zone: p.zone,
       phase: p.phase,
       url: r.url,
-      fileName: p.file.name,
+      // 원본 파일명은 화면·기록북·서버 어디에도 쓰지 않는다 (임의 ID만)
+      fileName: `photo-${newId().slice(0, 8)}`,
       sha256: r.sha256,
       memo: '',
       date: p.exifDate,
@@ -396,14 +398,17 @@ export default function RecordScreen() {
             <span className="rc-drop-icon">
               <Icon name="camera" size={24} />
             </span>
+            {/* disabled 대신 aria-disabled — 불러오는 동안에도 포커스를 잃지 않게 (onAddClick 이 중복 실행을 막는다) */}
             <button
+              ref={addBtnRef}
               type="button"
               className="btn primary rc-drop-btn"
               onClick={(e) => {
                 e.stopPropagation()
                 onAddClick()
               }}
-              disabled={adding || pending !== null}
+              aria-disabled={adding || pending !== null}
+              aria-busy={adding}
             >
               {adding && <span className="rc-spin" aria-hidden="true" />}
               {adding ? '사진 불러오는 중…' : '사진 추가'}
@@ -451,9 +456,7 @@ export default function RecordScreen() {
                         <div className="photo-badges">
                           <span className="badge">{p.zone}</span>
                           <span className={p.phase === '입주' ? 'badge ok' : 'badge warn'}>{p.phase}</span>
-                          <span className="muted small photo-file" title={p.fileName}>
-                            처리본 · {p.fileName}
-                          </span>
+                          <span className="muted small photo-file">처리본 · 사진 {i + 1}</span>
                         </div>
                         {mText && (
                           <div className="photo-mask">
@@ -682,7 +685,7 @@ export default function RecordScreen() {
 
       {limitOpen && <LimitDialog onClose={() => setLimitOpen(false)} onContinue={continueDemo} />}
 
-      {pending && <MaskEditor file={pending.file} label={`${pending.zone} · ${pending.phase}`} onCancel={onMaskCancel} onConfirm={onMaskConfirm} />}
+      {pending && <MaskEditor file={pending.file} label={`${pending.zone} · ${pending.phase}`} onCancel={onMaskCancel} onConfirm={onMaskConfirm} returnFocusRef={addBtnRef} />}
     </section>
   )
 }
