@@ -1,120 +1,166 @@
 # 보증금 지킴이
 
-퇴실 공제 문자를 받은 자취 대학생이 개인정보를 기기에서 먼저 가린 뒤 AI로 공제 항목·금액·원문 인용을 표로 정리하고, 물어볼 항목을 직접 골라 근거를 묻는 문자를 만드는 웹 서비스.
+> 자취생이 보증금 공제 내역과 입주·퇴실 자료를 AI로 정리하고, 문의할 내용과 상담 조건에 맞는 변호사를 찾는 AI 주거 기록 서비스.
 
-KOOKMIN AI BUILDER CHALLENGE 2026 (주제 "귀찮음 주식회사") 출품작 · 팀 MOTGA
+팀 **MOTGA** · KOOKMIN AI BUILDER CHALLENGE 2026(2026-10-03) 출품작 · 주제 "귀찮음 주식회사"
 
-| 항목 | 주소 |
+| | |
 |---|---|
-| 배포 | https://bojeung.193-123-163-215.sslip.io |
+| 서비스 | https://bojeung.193-123-163-215.sslip.io |
 | 발표자료 | https://bojeung.193-123-163-215.sslip.io/slides/ |
-| 저장소 | https://github.com/a1paka12/AIBuilder_Challenge |
-| PRD | [docs/PRD.md](docs/PRD.md) |
+| PRD(정본) | [docs/PRD.md](docs/PRD.md) |
+| 심사용 테스트 계정 | 아이디 `admin` / 비밀번호 `test` (헤더 [로그인·회원가입] → 로그인 탭. 공용 계정이라 탈퇴할 수 없고, 저장한 사진은 같은 계정 사용자끼리 보여요. 개인 사진은 올리지 마세요) |
 
-> 보증금 지킴이는 공개 자료를 찾아 보여 주는 정보 제공 도구이며, 법률 판단이나 대리를 하지 않습니다. AI는 공제 내역을 정리만 하고, 공제가 맞는지·특약이 유효한지·얼마를 돌려받을지는 판단하지 않습니다.
+## 어떤 문제를 푸나요
 
-## 주요 기능
+퇴실할 때 집주인에게 청소·도배·장판 공제 문자를 받으면, 항목과 금액을 옮겨 적고 근거를 물어보는 첫 문자를 직접 써야 합니다. 상담이 필요하면 변호사의 업무 분야·지역·방식·비용도 직접 비교해야 하고, 개인정보가 담긴 자료를 외부 AI에 그대로 넘기는 것도 부담입니다.
 
-| FR | 구분 | 기능 | 화면 | 요약 |
-|---|---|---|---|---|
-| FR-01 | 필수 | 기기 내 개인정보 제거·전송 | `#/deduct`, `#/record` | 텍스트는 브라우저에서 전화번호·계좌·주민등록번호·이메일 패턴과 직접 추가한 단어(이름 / 주소 / 기타)를 "[전화번호 삭제]" 형식으로 바꾸고, "위 전송본을 확인했어요"를 체크해 실제 전송본을 확인한 뒤에만 보냄. 사진(JPEG·PNG)은 불투명 상자로 가리고 Canvas로 다시 인코딩해 메타데이터를 지운 뒤, 처리본의 지문(SHA-256)만 서버에 기록 |
-| FR-02 | 필수 | AI 공제 정리·문의 준비 | `#/deduct` | OpenAI 구조화 출력으로 항목명·청구액·원문 인용만 추출. 사용자가 원문과 대조·확인하고 물어볼 항목을 고르면 "내가 근거를 물어볼 금액" 합계, 참고 자료 5종, 고정 서식 문의 문자(복사) 표시 |
-| FR-03 | 필수 | 변호사 조건 추천 | `#/lawyer` | 상담 주제·방식·지역·예산·시점·언어를 "꼭 필요 / 선호 / 상관없음"으로 고르면 브라우저 안에서 조건 일치 점수를 계산해 최대 3명과 추천 이유 표시(데모용 가상 변호사 A~H 8명). 0명이면 안내와 [조건 수정] |
-| FR-04 | 선택 | 방 상태 기록북·상품 체험 | `#/record` | 가린 사진 2장 무료 체험, 구역·입주/퇴실·날짜·메모, 나란히 보기, 기록북 미리보기·인쇄/PDF 저장. 기록북 4,900원은 가격 가설(결제 미연결) |
-| FR-05 | 선택 | 내용증명 빈칸 서식 | `#/cert` | 고정 문단 서식(AI 작성 아님), 브라우저에서 PDF 저장, 2,900원 가격 가설·결제 미연결, 발송은 사용자가 직접 |
-| FR-06 | 선택 | 30초 현장 설문·구매 의향 | `#/`, `#/event`, `#/pricing` | 선택지만 받는 설문, 구매 의향 기록(결제 아님), 익명 집계 |
-| FR-07 | 선택 | 출시 이벤트 팝업·이벤트 상세 | `#/`, `#/event` | 첫 화면 레이어 팝업 2칸, 설문 응답 시 이 기기에서 기록북 범위(사진 30장)까지 체험 |
-| FR-08 | 선택 | 무료 상담 기관 안내 | `#/help` | 무료 상담 기관 5곳과 확인일 |
-| FR-09 | 선택 | 개인정보 처리방침·고객센터 | `#/privacy`, `#/support` | 처리 표시(라벨링) 6칸, 목차, 제1~14조, 국외 이전(OpenAI 미국·Oracle 일본) 고지. 고객센터는 업무별 안내 + 문의하기(GitHub 이슈, 전화 없음) + 자주 찾는 곳 |
-| FR-10 | 선택 | 회원가입·구글 간편 가입 + 가입 설문 | `#/signup` | 필수 동의 2개 → 구글로 간편 가입 또는 이메일·비밀번호 가입 → 30초 설문(건너뛰기 가능) → 완료. 내 계정에서 로그아웃·탈퇴(즉시 삭제). 이메일과 비밀번호 해시(또는 구글 계정 식별값)만 저장하며 **이메일 인증은 아직 없음**. 가입하지 않아도 모든 기능 사용 가능 |
+보증금 지킴이는 **기기 안에서 개인정보를 먼저 가린 뒤** AI가 공제 항목·금액·근거 문장만 정리하고, 사용자가 확인한 항목으로 고정 서식의 문의 문자를 만들어 줍니다. **AI는 공제 책임·특약 효력·환급액을 판단하지 않습니다.**
 
-키보드만으로 모든 기능을 쓸 수 있게 만들었고, 배포본 9개 화면에서 axe(WCAG 2 A·AA) 심각·치명 0건을 자체 점검했습니다(인증 아님). 점검 스크립트는 `scripts/`에 있습니다. 화면별 설계는 [docs/SCREENS.md](docs/SCREENS.md)에 있습니다.
+## 핵심 기능
 
-> **변호사 프로필은 데모용 가상 데이터입니다.** 실제 변호사가 아니며 연락처·예약·후기·승소 실적이 없습니다. 서비스는 소개비·수수료·광고비를 받지 않고, 돈으로 순위를 바꾸지 않습니다. 실제 변호사는 대한변호사협회 공식 변호사 검색에서 확인하세요.
+| ID | 우선순위 | 기능 | 한 줄 요약 |
+|---|---|---|---|
+| FR-01 | 필수 | 기기 내 개인정보 제거·전송 | 전화·계좌·주민번호·이메일은 자동으로, 이름·주소는 직접 지정해 `[전화번호 삭제]`처럼 치환. 사진은 불투명 가림 상자 + 메타데이터 제거. **전송본을 확인해야만** 처리본이 서버로 감 |
+| FR-02 | 필수 | AI 공제 정리·문의 준비 | 처리본에서 항목·금액·원문 인용 추출 → 원문 대조·확인 → 물어볼 항목 체크 → "내가 근거를 물어볼 금액" 합계, 출처·범위가 붙은 공개 자료, 고정 문의 문자 복사 |
+| FR-03 | 필수 | 변호사 조건 추천 | 상담 주제·방식·지역·예산·시점·언어(꼭 필요/선호/상관없음) → 조건 일치 점수로 후보 최대 3명과 추천 이유. 후보 없음·조건 수정. **데모용 가상 프로필, 소개비·수수료·광고비 없음** |
+| FR-04 | 선택 | 방 상태 기록북·상품 체험 | 가린 사진 2장 무료 체험(구역·입주/퇴실·메모, 날짜는 서버 기록 시각), 기록북 미리보기·PDF 저장, 기록북 4,900원 가격 가설과 무료 체험 비교 |
+| FR-05 | 선택 | 내용증명 빈칸 서식 | AI가 쓰지 않는 고정 문단·선택 문단, 체크한 공제 항목 자동 입력, 브라우저 PDF 저장(2,900원 가격 가설, 결제 미연결), 발송은 사용자가 직접 |
+| FR-06 | 선택 | 30초 현장 설문·구매 의향 | 회원가입 마지막 단계·#/event 설문(이름·연락처 없음), #/pricing 의향 버튼(결제 아님) |
+| FR-07 | 선택 | 출시 이벤트 팝업·이벤트 상세 | 첫 방문 레이어 팝업(안내 2장), 설문 응답 시 기록북 체험 범위 확대 |
+| FR-08 | 선택 | 무료 상담 기관 안내 | 대한법률구조공단·주택임대차분쟁조정위원회·서울시 마을변호사·국민대 법률상담센터·대한변협 검색, 확인일 표시 |
+| FR-09 | 선택 | 개인정보 처리방침·고객 응대 정보 | 처리 표시(라벨링) 6칸·제1~14조, 국외 이전(OpenAI 미국·Oracle 일본) 고지, 바닥글 사업자 정보·준수·점검 표시 |
+| FR-10 | 선택 | 회원가입·구글 간편 가입 + 가입 설문 | 이메일 또는 구글로 가입 → 30초 설문 → 내 계정(로그아웃·탈퇴 즉시 삭제). 로그인하면 가린 사진을 내 계정에 보관 |
+
+완료 기준 원문과 세부 동작은 [docs/PRD.md](docs/PRD.md) 5절·5-1절에 있습니다.
+
+## 화면
+
+| 경로 | 화면 |
+|---|---|
+| `#/` | 첫 화면(메인 비주얼 → 진행 4단계 → 고객센터 안내 → 약속 → 이벤트 띠, 첫 방문 팝업) |
+| `#/deduct` | 공제 정리 (`?sample=1` 합성 예시) |
+| `#/record` | 방 상태 기록·기록북 |
+| `#/lawyer` | 변호사 찾아보기(단계식: 조건 고르기 → 후보 보기) |
+| `#/help` | 무료 상담 기관 |
+| `#/cert` | 내용증명 빈칸 서식 |
+| `#/pricing` | 가격 안내·구매 의향 |
+| `#/event` | 출시 기념 이벤트 |
+| `#/support` | 고객센터(업무별 안내·이용 안내·문의하기) |
+| `#/signup` | 회원가입·로그인·내 계정 |
+| `#/privacy` | 개인정보 처리방침 |
+
+헤더 바로 아래 업무 아이콘 줄(공제 · 기록 · 변호사 · 상담 · 내용증명 · 이벤트 · 가격 · 고객센터)에서 모든 화면으로 갈 수 있습니다.
+
+## 개인정보·법적 설계
+
+- **AI는 정리만 합니다.** 공제가 맞는지, 돌려받을 수 있는지는 판단하지 않고, 법률 문서는 고정 서식입니다.
+- **원본은 기기 밖으로 나가지 않습니다.** 텍스트는 브라우저에서 치환한 처리본만, 사진은 가리고 메타데이터를 지운 처리본(로그인 후 저장할 때) 또는 해시값만 서버로 갑니다. 서버가 한 번 더 가리고, 메타데이터가 남은 사진은 거절합니다.
+- **변호사 소개비·수수료·광고비를 받지 않습니다**(변호사법 제34조·제109조). 후보는 데모용 가상 프로필이고 연락·예약 기능은 없습니다.
+- **국외 이전을 알립니다**(개인정보 보호법 제28조의8): OpenAI(미국), Oracle Cloud(일본 도쿄).
+- **인증마크·정부 상징·기관 로고를 쓰지 않습니다.** 바닥글의 "준수·점검 표시"와 원칙 마크는 팀이 직접 지키고 점검한 내용이며 인증이 아닙니다.
+
+## 기술 구성
+
+| 구분 | 내용 |
+|---|---|
+| 화면 | React 19 + TypeScript + Vite 8, 해시 라우팅, Pretendard |
+| 서버 | Node.js 22 + Express 4 (`server/server.mjs`) |
+| AI | OpenAI API `gpt-5.4-mini`, 구조화 출력(JSON Schema strict) |
+| 데이터 | SQLite(`node:sqlite`) `receipts`·`intents`·`survey`·`metrics`·`users`·`photos` + 가린 사진 파일 폴더 |
+| 로그인 | 이메일·비밀번호(scrypt) 또는 Google Identity Services(서버에서 ID 토큰 검증), HttpOnly 세션 쿠키 |
+| 배포 | Oracle Cloud 도쿄 리전(Ubuntu 22.04) + Caddy(HTTPS) + systemd, `deploy.sh` |
 
 ## 로컬 실행
-
-Node.js 22 이상이 필요합니다(서버가 내장 `node:sqlite`를 씁니다).
 
 ```bash
 npm install
 cp .env.example .env      # .env를 열어 OPENAI_API_KEY 등을 채운다
 
-# 개발 모드 (화면 수정 즉시 반영)
+# 개발 모드(화면 수정 즉시 반영). API까지 쓰려면 다른 터미널에서 npm start
 npm run dev
 
-# 배포와 같은 방식 (빌드 후 Express가 화면과 API를 함께 제공)
+# 배포와 같은 방식(빌드 후 Express가 화면과 API를 함께 제공)
 npm run build && npm start   # http://localhost:8420
 ```
 
-- `OPENAI_API_KEY`가 비어 있어도 서버는 뜹니다. 이때 AI 정리는 "AI 연결이 준비되지 않았어요" 안내를 띄우고, 직접 입력과 합성 예시(`#/deduct?sample=1`)는 그대로 쓸 수 있습니다.
-- 개발 모드에서 API까지 쓰려면 다른 터미널에서 `npm start`로 서버도 띄웁니다.
-
 ### 환경 변수
 
-`.env`는 저장소에 올리지 않습니다. 이름과 기본값은 [.env.example](.env.example)에 있습니다.
+`.env`는 저장소에 올리지 않습니다. 이름은 [.env.example](.env.example)에 있습니다.
 
 | 이름 | 용도 |
 |---|---|
-| `OPENAI_API_KEY` | OpenAI API 키 (서버에서만 사용) |
-| `OPENAI_MODEL` | 사용할 모델 (기본 `gpt-5.4-mini`) |
-| `PORT` | 서버 포트 (기본 `8420`) |
-| `RECEIPT_SECRET` | 사진 지문 기록의 HMAC 서명 키 |
-| `GOOGLE_CLIENT_ID` | 구글 간편 가입용 OAuth 웹 클라이언트 ID(공개값). 비우면 구글 버튼 대신 "구글 간편 가입 준비 중"이 보이고 이메일 가입만 됨 |
-| `SESSION_SECRET` | 로그인 세션 쿠키(`bj_session`) HMAC 서명 키. 비우면 `RECEIPT_SECRET`을 씀. 바꾸면 기존 로그인이 모두 풀림 |
+| `OPENAI_API_KEY`, `OPENAI_MODEL` | 공제 정리 AI |
+| `PORT` | 서버 포트(기본 8420) |
+| `RECEIPT_SECRET` | 사진 기록 서명 |
+| `SESSION_SECRET` | 로그인 쿠키 서명 |
+| `GOOGLE_CLIENT_ID` | 구글 간편 가입(없으면 버튼 대신 "준비 중") |
+| `TEST_ACCOUNT_ID`, `TEST_ACCOUNT_PASSWORD` | 심사용 공용 테스트 계정 시드(둘 다 있을 때만 생성) |
+| `DATA_DIR`, `PHOTO_PURGE_AT` | (선택) 데이터 폴더, 사진 일괄 삭제 시각 |
 
-### 구글 Client ID 설정 (선택)
+구글 Client ID는 Google Cloud Console에서 웹 애플리케이션용 OAuth 클라이언트를 만들고, 승인된 JavaScript 원본에 배포 주소와 `http://localhost:8420`, `http://localhost:5173`을 넣으면 됩니다. 클라이언트 보안 비밀(secret)은 쓰지 않습니다.
 
-1. [Google Cloud Console](https://console.cloud.google.com/) → API 및 서비스 → **OAuth 동의 화면**을 만든다(외부, 앱 이름·지원 이메일만). 범위는 기본(`openid`·`email`·`profile`)만 쓰고 추가 범위는 요청하지 않는다.
-2. **사용자 인증 정보 → 사용자 인증 정보 만들기 → OAuth 클라이언트 ID → 웹 애플리케이션**.
-3. **승인된 JavaScript 원본**에 아래 세 주소를 넣는다(리디렉션 URI는 필요 없음 — 버튼이 ID 토큰을 바로 돌려준다).
-   - 배포 주소 `https://bojeung.193-123-163-215.sslip.io`
-   - `http://localhost:8420` (빌드 후 `npm start`)
-   - `http://localhost:5173` (`npm run dev`)
-4. 만든 클라이언트 ID(`…apps.googleusercontent.com`)를 서버 `.env`의 `GOOGLE_CLIENT_ID`에 넣고 서버를 다시 시작한다. 화면은 `GET /api/config`로 이 값을 받아 구글 공식 버튼을 그린다. 클라이언트 보안 비밀(secret)은 쓰지 않는다.
-5. 서버는 받은 ID 토큰을 `https://oauth2.googleapis.com/tokeninfo`로 검증(aud·iss·exp·email_verified)한 뒤에만 가입·로그인시킨다. 흐름은 [ARCHITECTURE 4-1](docs/ARCHITECTURE.md)에 있다.
+## 점검 방법
 
-- OAuth 동의 화면이 "테스트" 상태면 테스트 사용자로 등록한 구글 계정만 로그인할 수 있다.
+모든 점검은 실제 Chrome을 휴대폰 크기(390×844)로 띄워 사람처럼 클릭·입력하는 스크립트로 했습니다. 테스트 데이터가 실제 숫자에 섞이지 않게 기능 점검은 로컬 서버에서 했습니다.
+
+| 스크립트 | 확인하는 것 | 결과 |
+|---|---|---|
+| `scripts/a11y-check.cjs` | 화면 11개의 접근성(axe-core, WCAG A·AA 심각·치명), 콘솔 오류, 금지 문구 | 위반 0 · 오류 0 · 금지 문구 0 |
+| `scripts/keyboard-check.cjs` | Tab만으로 전 화면 도달, 공제 흐름 키보드 완료, 팝업 포커스 가둠·Esc, 화면 이동 시 제목 포커스, 스크린리더 알림 | 통과 |
+| `scripts/lawyer-check.mjs` | 07 명세 검산(가상 A 100·B 75·C 65), 꼭 필요 제외, 전화만 선택 시 지역 제외(A 100·B 88·C 59), 0명·1명, 동점 | 통과 |
+| `scripts/score-props.mjs` | 조건 일치 점수식 성질 검사(무작위 조건 2,000개 × 후보 8명 = 16,000쌍): 0~100 정수, 독립 계산과 일치, 상관없음 무영향, 모두 맞으면 100 | 통과 |
+
+```bash
+node scripts/lawyer-check.mjs
+node scripts/score-props.mjs
+# 화면 점검은 playwright·axe-core 설치 후: node scripts/a11y-check.cjs http://localhost:8420
+```
+
+그 밖에 실제 공제 문자(가상의 이름·전화·계좌·이메일·주민번호·주소)로 전송본 확인 전 서버 요청 0회, 보낸 요청 본문에 원래 개인정보가 없는 것을 확인했습니다. 실제 스크린리더 음성과 기록북 PDF 내용은 사람이 직접 확인해야 합니다.
+
+## 범위 밖(이번에 만들지 않은 것)
+
+실결제·기관 대시보드, 이미지 공제 내용 자동 추출·전체 계약서 분석·로컬 OCR 자동 가림, 공제 책임·환급액·적정 수리비 판단, 사진 촬영 시점·법적 효력 인증, AI 법률문서 작성·자동 발송, 변호사 예약 확정·자료 자동 전달·유료 추천 순위, 원본 서버 보관·장기 보관·공개 공유 링크.
 
 ## 폴더 구조
 
-```text
+```
 src/
-  screens/      화면 (Home, Deduct, Record, Lawyers, Help, Cert, Pricing, Event, Privacy, Signup)
-  components/   화면 부품 (공제 정리·첫 화면·기록 부품, 팝업, 설문, 바닥글 준수 표시, 서비스 원칙 마크)
-  lib/          순수 로직 (mask.ts 텍스트 가림, imageMask.ts 사진 가림, lawyerMatch.ts 조건 일치 계산 등)
-  data/         고정 데이터 (참고 자료, 가상 변호사 프로필, 무료 상담 기관, 운영 정보)
-  styles/       화면별 CSS
-server/
-  server.mjs    Express API(/api/*) + 빌드된 화면 제공, SQLite(server/data/, 저장소 제외)
-public/         공공누리·개인정보 처리 표시 아이콘, 발표자료(/slides/)
+  screens/      화면(Home, Deduct, Record, Lawyers, Help, Cert, Pricing, Event, Support, Signup, Privacy)
+  components/   공통 부품(deduct/*, record/*, home/*, PromoPopup, FooterCompliance, ServiceMarks 등)
+  lib/          브라우저 로직(mask.ts 개인정보 치환, imageMask.ts 사진 가림, lawyerMatch.ts 점수, auth.ts, photos.ts)
+  data/         참고 자료·상담 기관·가상 프로필·회사 정보
+server/server.mjs   API·AI 호출·인증·사진 보관·SQLite
+scripts/        점검 스크립트
 docs/           PRD와 설계 문서
-scripts/        점검 스크립트 (a11y-check.cjs 접근성·금지 문구, keyboard-check.cjs 키보드·알림, lawyer-check.mjs 변호사 검산)
-deploy.sh       배포 스크립트 (빌드 → rsync → systemd 재시작)
+public/marks/   공공누리 제4유형 마크, 개인정보 처리 표시 아이콘
 ```
 
 ## 문서
 
 | 문서 | 내용 |
 |---|---|
-| [PRD](docs/PRD.md) | 문제·타깃·요구사항(FR)·범위·부록(AI·오픈소스 사용 내역) |
-| [아키텍처](docs/ARCHITECTURE.md) | 구성도, 데이터 흐름, 배포, 보안, 개발 방식 |
-| [화면 설계](docs/SCREENS.md) | 화면별 구성·상태·오류·접근성 |
-| [API](docs/API.md) | `/api/*` 요청·응답 |
-| [ERD](docs/ERD.md) | SQLite 표와 브라우저 저장소 |
-| [개인정보·법적 설계](docs/PRIVACY_LEGAL.md) | 처리 항목, 보유, 국외 이전, 법적 경계 |
-| [참고 자료](docs/REFERENCES.md) | 화면에 쓰는 공개 자료의 출처·범위 |
-| [테스트 시나리오](docs/TEST_SCENARIOS.md) | FR별 확인 절차 |
+| [PRD.md](docs/PRD.md) | 제품 요구사항(정본) |
+| [FUNCTIONAL_SPEC.md](docs/FUNCTIONAL_SPEC.md) | 기능정의서 |
+| [SCREENS.md](docs/SCREENS.md) | 화면 구성 |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | 시스템 구조·데이터 흐름 |
+| [API.md](docs/API.md) | API 명세 |
+| [ERD.md](docs/ERD.md) | 데이터 구조 |
+| [PRIVACY_LEGAL.md](docs/PRIVACY_LEGAL.md) | 개인정보·법적 설계, 예상 질문 |
+| [REFERENCES.md](docs/REFERENCES.md) | 참고 자료 출처 |
+| [TEST_SCENARIOS.md](docs/TEST_SCENARIOS.md) | 검증 시나리오와 결과 |
 
-## 라이선스·크레딧
+## 부록. AI 도구 · 템플릿 · 오픈소스 사용 내역
 
-| 구분 | 내용 |
-|---|---|
-| 오픈소스 | React · Vite · Express (MIT), TypeScript (Apache-2.0) |
-| 글꼴 | Pretendard (SIL Open Font License 1.1) |
-| 점검 도구 | Playwright, axe-core |
-| 자료 표시 | 공공누리 제4유형 마크(표준계약서 조항 출처 표시), 개인정보보호위원회 개인정보 처리 표시(라벨링) 아이콘 |
-| 템플릿 | 대회 PRD 템플릿 |
-| 개발 도구 | Claude Code(Claude Opus 5.5 구현·통합, Claude Fable 5.1 화면 디자인·기능 구현), Claude Code 멀티 에이전트 워크플로, Claude 디자인 캔버스(Artifact), Codex(요구사항·PRD 작성·검토), Opus 5.5 Max(조사) |
+- **AI 도구(개발):** Claude Code(Claude Opus 5.5: 구현·통합, Claude Fable 5.1: 화면 디자인·기능 구현), Claude Code 멀티 에이전트 워크플로(파일 소유권을 나눠 병렬 작업), Claude 디자인 캔버스(Artifact) 시안, Codex(팀원: 요구사항·PRD 작성·검토), Gemini 3.1 Pro(팀원: 대회 안내 사진 전사), Claude Opus 5.5 Max(팀원: 문제·시장·경쟁·규제 조사).
+- **AI(서비스 안):** OpenAI API `gpt-5.4-mini`(공제 항목 정리만).
+- **템플릿:** 대회 제공 PRD 템플릿과 PRD 작성 가이드.
+- **오픈소스·라이브러리:** React, React DOM, Vite, TypeScript, Express, Playwright·axe-core(점검), Google Identity Services(구글 간편 가입).
+- **글꼴·자료:** Pretendard(SIL Open Font License 1.1), 공공누리 제4유형 마크(법무부 주택임대차표준계약서 인용 카드), 개인정보보호위원회 「개인정보 처리방침 작성지침」 처리 표시(라벨링) 아이콘.
 
-자세한 사용 내역은 [PRD 부록](docs/PRD.md)에 있습니다. 보증금 지킴이는 국민대학교 학생 팀의 프로젝트이며 국민대학교 공식 서비스가 아닙니다. 문의는 [GitHub 이슈](https://github.com/a1paka12/AIBuilder_Challenge/issues)로 받습니다(공개 게시판이라 개인정보는 적지 마세요).
+## 고지
+
+- 변호사 프로필은 **데모용 가상 데이터**입니다. 실제 변호사가 아니며 연락·예약할 수 없습니다.
+- 국민대학교 학생 팀 프로젝트이며 국민대학교·정부·공공기관의 공식 서비스가 아닙니다. 어떤 정보보호·접근성 인증도 받지 않았습니다.
+- 가격(기록북 4,900원, 내용증명 서식 2,900원)은 검증 중인 가설이며 결제는 연결하지 않았습니다.
